@@ -7,7 +7,11 @@ from src.models.card import Card, ClaimRank, Rank, Suit
 
 
 def evaluate_claim_rank(cards: Iterable[Card]) -> ClaimRank:
-    regular_cards = [card for card in cards if not card.is_special and card.rank and card.suit]
+    regular_cards = [
+        card
+        for card in cards
+        if not card.is_special and card.rank and card.suit
+    ]
     if not regular_cards:
         return ClaimRank.HIGH_CARD
 
@@ -42,7 +46,11 @@ def claim_is_truthful(cards: Iterable[Card], claimed_rank: ClaimRank) -> bool:
 def _has_full_house(rank_counts: Counter[Rank]) -> bool:
     triples = [rank for rank, count in rank_counts.items() if count >= 3]
     pairs = [rank for rank, count in rank_counts.items() if count >= 2]
-    return any(pair_rank != triple_rank for triple_rank in triples for pair_rank in pairs)
+    return any(
+        pair_rank != triple_rank
+        for triple_rank in triples
+        for pair_rank in pairs
+    )
 
 
 def _has_straight(rank_counts: Counter[Rank]) -> bool:
@@ -54,7 +62,10 @@ def _has_straight_flush(cards: list[Card]) -> bool:
     by_suit: dict[Suit, set[int]] = {}
     for card in cards:
         by_suit.setdefault(card.suit, set()).add(int(card.rank))
-    return any(_has_consecutive_run(sorted(ranks), needed_length=5) for ranks in by_suit.values())
+    return any(
+        _has_consecutive_run(sorted(ranks), needed_length=5)
+        for ranks in by_suit.values()
+    )
 
 
 def _has_royal_flush(cards: list[Card]) -> bool:

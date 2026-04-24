@@ -162,14 +162,21 @@ class GameEngine:
             )
             claim_cards = player.remove_cards_by_indices(chosen_indices)
             summary_parts.append(
-                f"{player.name} uses Blindfold and commits {len(claim_cards)} hidden cards."
+                f"{player.name} uses Blindfold and commits "
+                f"{len(claim_cards)} hidden cards."
             )
             narration_key = "blindfold_claim"
         elif special == SpecialCardType.MEMORY_WIPE:
-            adjusted_indices = self._consume_special(player, action.special_card_index, list(action.card_indices))
+            adjusted_indices = self._consume_special(
+                player,
+                action.special_card_index,
+                list(action.card_indices),
+            )
             state.public_memory_log.clear()
             claim_cards = player.remove_cards_by_indices(adjusted_indices)
-            summary_parts.append(f"{player.name} wipes the table memory clean before claiming.")
+            summary_parts.append(
+                f"{player.name} wipes the table memory clean before claiming."
+            )
             narration_key = "memory_wipe"
         elif special == SpecialCardType.WILDCARD_HAND:
             self._consume_special(player, action.special_card_index)
@@ -177,7 +184,9 @@ class GameEngine:
             player.draw_from_deck(state.deck, 5)
             chosen_indices = player.claimable_card_indices[:3]
             claim_cards = player.remove_cards_by_indices(chosen_indices)
-            summary_parts.append(f"{player.name} draws five new cards with Wildcard Hand.")
+            summary_parts.append(
+                f"{player.name} draws five new cards with Wildcard Hand."
+            )
             narration_key = "wildcard_hand"
         else:
             adjusted_indices = list(action.card_indices)
@@ -239,13 +248,18 @@ class GameEngine:
             self._append_narration(narration_key)
 
         state.current_turn_index = self._next_active_seat(player.seat_index)
+        claim_name = state.current_claim.rank.name.replace("_", " ").title()
         summary_parts.append(
-            f"{player.name} claims {state.current_claim.rank.name.replace('_', ' ').title()} with {len(claim_cards)} card(s)."
+            f"{player.name} claims {claim_name} with {len(claim_cards)} card(s)."
         )
         self._notify_ai(state.turn_history[-1])
         return ActionResult(summary=" ".join(summary_parts))
 
-    def _process_challenge(self, player: PlayerState, action: TurnAction) -> ActionResult:
+    def _process_challenge(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+    ) -> ActionResult:
         state = self._require_state()
         if state.current_claim is None or state.current_claimant_index is None:
             return ActionResult(summary=f"{player.name} has nothing to challenge.")

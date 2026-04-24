@@ -4,7 +4,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 import random
 
-from constants import MAX_REPUTATION, MIN_REPUTATION, REVOLVER_CHAMBERS, STARTING_REPUTATION
+from constants import (
+    MAX_REPUTATION,
+    MIN_REPUTATION,
+    REVOLVER_CHAMBERS,
+    STARTING_REPUTATION,
+)
 from src.models.card import Card, Deck
 
 
@@ -66,7 +71,11 @@ class Revolver:
         return cls(chambers=chambers)
 
     def available_indices(self) -> list[int]:
-        return [index for index in range(len(self.chambers)) if index not in self.spent_indices]
+        return [
+            index
+            for index in range(len(self.chambers))
+            if index not in self.spent_indices
+        ]
 
     def fire(self, rng: random.Random | None = None) -> tuple[int, ChamberResult]:
         rng = rng or random.Random()
@@ -109,7 +118,10 @@ class PlayerState:
         return removed_cards
 
     def change_reputation(self, delta: int) -> None:
-        self.reputation = max(MIN_REPUTATION, min(MAX_REPUTATION, self.reputation + delta))
+        self.reputation = max(
+            MIN_REPUTATION,
+            min(MAX_REPUTATION, self.reputation + delta),
+        )
 
     @property
     def reputation_band(self) -> ReputationBand:
@@ -123,6 +135,7 @@ class PlayerState:
 
     def grant_shield(self, charges: int = 1) -> None:
         self.shield_charges += charges
+
     def resolve_bullet(self, rng: random.Random | None = None) -> BulletOutcome:
         if self.shield_charges > 0:
             self.shield_charges -= 1
@@ -156,4 +169,8 @@ class PlayerState:
         return len(self.claimable_card_indices)
 
     def special_cards(self) -> list[tuple[int, Card]]:
-        return [(index, card) for index, card in enumerate(self.hand) if card.is_special]
+        return [
+            (index, card)
+            for index, card in enumerate(self.hand)
+            if card.is_special
+        ]
