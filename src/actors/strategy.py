@@ -25,7 +25,7 @@ class AIContext:
 
 
 class BaseAIStrategy(ABC):
-    def init(self, owner_name: str, rng: random.Random | None = None) -> None:
+    def __init__(self, owner_name: str, rng: random.Random | None = None) -> None:
         self.owner_name = owner_name
         self.rng = rng or random.Random()
 
@@ -204,6 +204,7 @@ class BaseAIStrategy(ABC):
             if record.actor_profile_key is None and record.actor_name != self.owner_name
         ]
         return window[-limit:]
+
     def _mode_value(
         self,
         values: list[int],
@@ -424,8 +425,8 @@ class MrFoldStrategy(BaseAIStrategy):
 
 
 class VesperStrategy(BaseAIStrategy):
-    def init(self, owner_name: str, rng: random.Random | None = None) -> None:
-        super().init(owner_name=owner_name, rng=rng)
+    def __init__(self, owner_name: str, rng: random.Random | None = None) -> None:
+        super().__init__(owner_name=owner_name, rng=rng)
         self.pressure = 0
 
     def choose_action(self, context: AIContext) -> TurnAction:
@@ -492,8 +493,10 @@ class VesperStrategy(BaseAIStrategy):
     def observe_turn(self, turn_record: TurnRecord) -> None:
         if turn_record.actor_name != self.owner_name and turn_record.action == ActionType.CLAIM.value:
             self.pressure = min(4, self.pressure + 1)
-    class FoxStrategy(BaseAIStrategy):
-     def choose_action(self, context: AIContext) -> TurnAction:
+
+
+class FoxStrategy(BaseAIStrategy):
+    def choose_action(self, context: AIContext) -> TurnAction:
         current_band = context.player.reputation_band
         if current_band == ReputationBand.TRUSTED:
             style = PresentationStyle.THEATRICAL
