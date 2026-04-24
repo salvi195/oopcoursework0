@@ -1140,4 +1140,679 @@ class BluffingGameApp:
         self._blit_soft_ellipse(pygame.Rect(body.x + 36, body.y + 10, 96, 48), (214, 220, 228, 18))
         self._blit_soft_ellipse(pygame.Rect(body.x + 70, body.y + 72, 142, 60), (18, 20, 24, 34))
         head = pygame.Rect(x - 86, y - 104, 172, 164)
-        pygame.draw.ellipse(self.screen, fur, head)...
+        pygame.draw.ellipse(self.screen, fur, head)
+        self._blit_soft_ellipse(pygame.Rect(head.x + 28, head.y + 14, 78, 48), (255, 230, 198, 30))
+        self._blit_soft_ellipse(pygame.Rect(head.x + 60, head.y + 66, 84, 52), (82, 50, 36, 32))
+        pygame.draw.polygon(self.screen, horn, [(x - 66, y - 62), (x - 118, y - 102), (x - 82, y - 54)])
+        pygame.draw.polygon(self.screen, horn, [(x + 66, y - 62), (x + 118, y - 102), (x + 82, y - 54)])
+        muzzle_rect = pygame.Rect(x - 44, y - 6, 88, 56)
+        pygame.draw.ellipse(self.screen, muzzle, muzzle_rect)
+        pygame.draw.circle(self.screen, (86, 56, 42), (x - 16, y + 20), 7)
+        pygame.draw.circle(self.screen, (86, 56, 42), (x + 16, y + 20), 7)
+        pygame.draw.circle(self.screen, (244, 244, 240), (x - 34, y - 18), 11)
+        pygame.draw.circle(self.screen, (244, 244, 240), (x + 34, y - 18), 11)
+        pygame.draw.circle(self.screen, outline, (x - 32, y - 18), 5)
+        pygame.draw.circle(self.screen, outline, (x + 32, y - 18), 5)
+        pygame.draw.arc(self.screen, (204, 183, 120), pygame.Rect(x - 16, y + 20, 32, 24), 0.15, 3.0, 4)
+        arm_left = [(x - 70, y + 108), (x - 126, y + 152), (x - 138, y + 198), (x - 108, y + 198), (x - 58, y + 148)]
+        arm_right = [(x + 70, y + 108), (x + 126, y + 150), (x + 148, y + 194), (x + 118, y + 198), (x + 58, y + 148)]
+        pygame.draw.polygon(self.screen, fur, arm_left)
+        pygame.draw.polygon(self.screen, fur, arm_right)
+        pygame.draw.ellipse(self.screen, fur, pygame.Rect(x - 142, y + 188, 36, 24))
+        pygame.draw.ellipse(self.screen, fur, pygame.Rect(x + 118, y + 184, 36, 26))
+        self._draw_card_fan((x + 170, y + 172), min(hand_size, 4), 16, -16, True, claimant)
+        pygame.draw.ellipse(self.screen, outline, body, 4)
+        pygame.draw.lines(self.screen, outline, False, [shoulders[0], shoulders[1], shoulders[2]], 4)
+        pygame.draw.lines(self.screen, outline, False, [shoulders[3], shoulders[4], shoulders[5], shoulders[0]], 4)
+        pygame.draw.ellipse(self.screen, outline, head, 4)
+        pygame.draw.polygon(self.screen, outline, arm_left, 4)
+        pygame.draw.polygon(self.screen, outline, arm_right, 4)
+        pygame.draw.ellipse(self.screen, outline, muzzle_rect, 3)
+
+    def _draw_fox_character(
+        self,
+        x: int,
+        y: int,
+        active: bool,
+        claimant: bool,
+        hand_size: int,
+    ) -> None:
+        outline = (43, 22, 18)
+        fur = (196, 116, 72)
+        fur_dark = (118, 62, 46)
+        fur_light = (234, 196, 162)
+        top = (62, 27, 31)
+        self._draw_halo((x - 18, y + 10), 56, active)
+        body = pygame.Rect(x - 94, y + 88, 174, 128)
+        shoulders = [
+            (x - 90, y + 194),
+            (x - 76, y + 120),
+            (x - 36, y + 90),
+            (x + 12, y + 88),
+            (x + 54, y + 104),
+            (x + 74, y + 194),
+        ]
+        pygame.draw.ellipse(self.screen, fur, body)
+        pygame.draw.polygon(self.screen, fur, shoulders)
+        blouse = [(x - 44, y + 192), (x - 8, y + 100), (x + 42, y + 94), (x + 76, y + 194)]
+        pygame.draw.polygon(self.screen, top, blouse)
+        self._blit_soft_ellipse(pygame.Rect(body.x + 18, body.y + 12, 68, 38), (248, 214, 182, 24))
+        self._blit_soft_ellipse(pygame.Rect(body.x + 44, body.y + 64, 86, 46), (74, 34, 30, 32))
+        neck = [(x - 18, y + 88), (x + 18, y + 88), (x + 30, y + 110), (x - 26, y + 112)]
+        pygame.draw.polygon(self.screen, fur, neck)
+        pygame.draw.arc(self.screen, outline, body, 0.32, math.pi - 0.32, 3)
+        pygame.draw.lines(self.screen, outline, False, [shoulders[0], shoulders[1], shoulders[2]], 3)
+        pygame.draw.lines(
+            self.screen,
+            outline,
+            False,
+            [shoulders[3], shoulders[4], shoulders[5], shoulders[0]],
+            3,
+        )
+        pygame.draw.polygon(self.screen, outline, blouse, 3)
+        head = pygame.Rect(x - 36, y + 22, 88, 80)
+        pygame.draw.ellipse(self.screen, fur, head)
+        self._blit_soft_ellipse(pygame.Rect(head.x + 10, head.y + 8, 42, 18), (255, 230, 194, 26))
+        self._blit_soft_ellipse(pygame.Rect(head.x + 22, head.y + 32, 42, 26), (108, 58, 44, 26))
+        ear_left = [(x - 24, y + 32), (x - 8, y - 2), (x + 8, y + 34)]
+        ear_right = [(x + 4, y + 34), (x + 24, y + 2), (x + 38, y + 38)]
+        pygame.draw.polygon(self.screen, fur, ear_left)
+        pygame.draw.polygon(self.screen, fur, ear_right)
+        cheek = [(x - 18, y + 70), (x - 8, y + 50), (x + 8, y + 46), (x + 26, y + 52), (x + 28, y + 70), (x + 4, y + 82)]
+        pygame.draw.polygon(self.screen, fur_light, cheek)
+        muzzle = [(x - 8, y + 56), (x + 14, y + 54), (x + 22, y + 64), (x + 2, y + 74), (x - 10, y + 66)]
+        pygame.draw.polygon(self.screen, fur_light, muzzle)
+        pygame.draw.ellipse(self.screen, (244, 243, 238), pygame.Rect(x - 22, y + 40, 14, 8))
+        pygame.draw.ellipse(self.screen, (244, 243, 238), pygame.Rect(x + 2, y + 40, 14, 8))
+        pygame.draw.circle(self.screen, outline, (x - 14, y + 44), 3)
+        pygame.draw.circle(self.screen, outline, (x + 10, y + 44), 3)
+        pygame.draw.arc(self.screen, fur_dark, pygame.Rect(x - 24, y + 34, 20, 12), 3.7, 5.8, 2)
+        pygame.draw.arc(self.screen, fur_dark, pygame.Rect(x, y + 34, 20, 12), 3.7, 5.8, 2)
+        pygame.draw.polygon(self.screen, fur_dark, [(x + 2, y + 58), (x + 8, y + 64), (x + 2, y + 70)])
+        pygame.draw.arc(self.screen, outline, pygame.Rect(x - 4, y + 68, 14, 7), 0.25, 2.85, 2)
+        arm = [(x - 14, y + 136), (x - 84, y + 146), (x - 148, y + 142), (x - 144, y + 170), (x - 58, y + 168), (x - 6, y + 154)]
+        pygame.draw.polygon(self.screen, fur, arm)
+        hand = pygame.Rect(x - 148, y + 144, 30, 20)
+        pygame.draw.ellipse(self.screen, fur_light, hand)
+        necklace_y = y + 104
+        pygame.draw.line(self.screen, (214, 193, 150), (x - 14, necklace_y), (x + 34, necklace_y), 2)
+        pygame.draw.circle(self.screen, (214, 193, 150), (x + 10, necklace_y + 7), 4)
+        self._draw_card_fan((x - 162, y + 144), min(hand_size, 4), 16, -50, True, claimant)
+        pygame.draw.ellipse(self.screen, outline, head, 3)
+        pygame.draw.polygon(self.screen, outline, ear_left, 3)
+        pygame.draw.polygon(self.screen, outline, ear_right, 3)
+        pygame.draw.polygon(self.screen, outline, cheek, 2)
+        pygame.draw.polygon(self.screen, outline, muzzle, 2)
+
+    def _draw_card_fan(
+        self,
+        center: tuple[int, int],
+        count: int,
+        spread: int,
+        base_angle: int,
+        mirrored: bool,
+        highlighted: bool,
+    ) -> None:
+        for index in range(count):
+            offset = index - (count - 1) / 2
+            rect = pygame.Rect(
+                int(center[0] + offset * (spread // 1.5)),
+                int(center[1] - abs(offset) * 4),
+                56,
+                78,
+            )
+            angle = base_angle + int(offset * spread)
+            if mirrored:
+                angle *= -1
+            self._draw_card_back(rect, highlighted=highlighted and index == count - 1, angle=angle)
+
+    def _draw_halo(self, center: tuple[int, int], radius: int, enabled: bool) -> None:
+        if not enabled:
+            return
+        halo = pygame.Surface((radius * 3, radius * 3), pygame.SRCALPHA)
+        pygame.draw.circle(halo, (241, 202, 129, 32), (halo.get_width() // 2, halo.get_height() // 2), radius)
+        self.screen.blit(halo, halo.get_rect(center=center))
+
+    def _draw_tag(self, label: str, pos: tuple[int, int], color: tuple[int, int, int]) -> None:
+        text = self.fonts["tiny"].render(label, True, (18, 20, 24))
+        rect = text.get_rect()
+        rect.topleft = pos
+        badge = pygame.Rect(rect.x - 8, rect.y - 4, rect.width + 16, rect.height + 8)
+        pygame.draw.rect(self.screen, color, badge, border_radius=10)
+        self.screen.blit(text, rect)
+
+    def _build_table_buttons(self, panel_rect: pygame.Rect, claim_buttons_top: int) -> None:
+        if self.state is None or self.engine.is_match_over():
+            return
+        player = self.engine.current_player()
+        if not player.is_human:
+            return
+        legal_claims = self.engine.legal_claim_ranks()
+        can_claim = self.engine.player_can_make_claim(player)
+        if legal_claims and self.selected_claim_rank not in legal_claims:
+            self.selected_claim_rank = legal_claims[0]
+        self.buttons.extend(
+            [
+                UIButton(
+                    key="claim_prev",
+                    label="<",
+                    rect=pygame.Rect(panel_rect.x, panel_rect.y + 6, 36, 32),
+                    enabled=len(legal_claims) > 1,
+                ),
+                UIButton(
+                    key="claim_next",
+                    label=">",
+                    rect=pygame.Rect(panel_rect.right - 36, panel_rect.y + 6, 36, 32),
+                    enabled=len(legal_claims) > 1,
+                ),
+            ]
+        )
+        selected_special = self._selected_special_for(ActionType.CLAIM)
+        claim_enabled = can_claim and self.selected_claim_rank in legal_claims
+        selected_special_type = (
+            player.hand[selected_special].special if selected_special is not None else None
+        )
+        if selected_special_type == SpecialCardType.MIRROR_DAMAGE:
+            claim_enabled = False
+        elif selected_special_type not in {SpecialCardType.BLINDFOLD, SpecialCardType.WILDCARD_HAND}:
+            claim_enabled = claim_enabled and len(self.selected_cards) > 0
+        challenge_enabled = self.state.current_claim is not None
+        challenge_special = self._selected_special_for(ActionType.CHALLENGE)
+        self.buttons.extend(
+            [
+                UIButton(
+                    key="confirm_claim",
+                    label="Throw Cards",
+                    rect=pygame.Rect(panel_rect.x + 16, panel_rect.y + 58, panel_rect.width - 32, 34),
+                    enabled=claim_enabled,
+                ),
+                UIButton(
+                    key="challenge",
+                    label="Call Liar",
+                    rect=pygame.Rect(panel_rect.x + 16, panel_rect.y + 92, panel_rect.width - 32, 34),
+                    enabled=challenge_enabled and (
+                        self.selected_special_index is None or challenge_special is not None
+                    ),
+                ),
+                UIButton(
+                    key="reset_selection",
+                    label="Clear",
+                    rect=pygame.Rect(panel_rect.x + 16, panel_rect.y + 126, panel_rect.width - 32, 34),
+                    enabled=True,
+                ),
+            ]
+        )
+        if selected_special_type == SpecialCardType.BLINDFOLD:
+            self.buttons.extend(
+                [
+                    UIButton(
+                        key="blindfold_minus",
+                        label="-",
+                        rect=pygame.Rect(panel_rect.x + 56, panel_rect.y + 156, 34, 30),
+                    ),
+                    UIButton(
+                        key="blindfold_plus",
+                        label="+",
+                        rect=pygame.Rect(panel_rect.right - 90, panel_rect.y + 156, 34, 30),
+                    ),
+                ]
+            )
+
+    def _draw_end_overlay(self, mouse_pos: tuple[int, int]) -> None:
+        if self.state is None:
+            return
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((8, 10, 12, 170))
+        self.screen.blit(overlay, (0, 0))
+        rect = pygame.Rect(430, 265, 580, 250)
+        panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(panel, (16, 18, 22, 232), panel.get_rect(), border_radius=30)
+        pygame.draw.rect(panel, (214, 184, 123, 216), panel.get_rect(), 2, 30)
+        self.screen.blit(panel, rect.topleft)
+        winner = self.engine.winner()
+        title = self.fonts["title"].render("Table Decided", True, self.colors["text"])
+        self.screen.blit(title, title.get_rect(center=(rect.centerx, rect.y + 64)))
+        if winner is not None:
+            portrait = self.assets.portrait(winner.profile_key, (86, 108))
+            self.screen.blit(portrait, (rect.x + 62, rect.y + 86))
+            win_text = self.fonts["subtitle"].render(f"{winner.name} remains.", True, self.colors["gold"])
+            self.screen.blit(win_text, win_text.get_rect(center=(rect.centerx + 54, rect.y + 120)))
+        if self.state.narration_log:
+            self._draw_wrapped_text(
+                [self.state.narration_log[-1].text],
+                pygame.Rect(rect.x + 170, rect.y + 146, 360, 40),
+                self.fonts["body"],
+                self.colors["muted"],
+            )
+        end_buttons = [
+            UIButton("end_new_match", "New Match", pygame.Rect(rect.x + 88, rect.y + 192, 170, 42)),
+            UIButton("end_menu", "Menu", pygame.Rect(rect.x + 322, rect.y + 192, 170, 42)),
+        ]
+        self.buttons.extend(end_buttons)
+        for button in end_buttons:
+            self._draw_button(button, mouse_pos)
+
+    def _draw_side_panel(
+        self,
+        rect: pygame.Rect,
+        title: str,
+        lines: list[str],
+    ) -> None:
+        panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(panel, self.colors["panel_soft"], panel.get_rect(), border_radius=24)
+        pygame.draw.rect(panel, (*self.colors["border"], 205), panel.get_rect(), 2, 24)
+        self.screen.blit(panel, rect.topleft)
+        title_surface = self.fonts["subtitle"].render(title, True, self.colors["text"])
+        self.screen.blit(title_surface, (rect.x + 20, rect.y + 18))
+        self._draw_wrapped_text(
+            lines,
+            pygame.Rect(rect.x + 20, rect.y + 58, rect.width - 40, rect.height - 78),
+            self.fonts["small"],
+            self.colors["muted"],
+        )
+
+    def _ledger_lines(self) -> list[str]:
+        if self.state is None:
+            return []
+        lines = []
+        current = self.engine.current_player()
+        if self.last_result:
+            lines.append("Last exchange")
+            lines.append(self.last_result)
+            lines.append("")
+        lines.append(f"Round {self.state.round_number}")
+        lines.append(f"Current actor: {current.name}")
+        lines.append(
+            f"Current claim: {self.state.current_claim.display_text if self.state.current_claim else 'None'}"
+        )
+        lines.append("")
+        lines.append("Recent memory")
+        recent_memory = self.state.public_memory_log[-4:] or ["Nothing public yet."]
+        lines.extend(recent_memory)
+        return lines
+
+    def _action_lines(self) -> list[str]:
+        if self.state is None:
+            return []
+        player = self.engine.current_player()
+        if self.engine.is_match_over():
+            return ["The match is over.", "Choose what to do next."]
+        if not player.is_human:
+            return [f"{player.name} is reading the table.", "Wait for the move to land."]
+        lines = []
+        if self.status_message:
+            lines.extend(["Status", self.status_message, ""])
+        legal = self.engine.legal_claim_ranks()
+        if self.state.current_claim is None:
+            lines.extend(["You open the round.", "Any claim rank is legal."])
+        else:
+            lines.extend(
+                [
+                    f"You must beat {self.state.current_claim.display_text}.",
+                    "Challenge is always available while a claim is active.",
+                ]
+            )
+        lines.append("")
+        lines.append(f"Selected cards: {len(self.selected_cards)}")
+        lines.append(
+            f"Selected claim: {self.selected_claim_rank.label if self.selected_claim_rank else 'None'}"
+        )
+        special = self._active_special_label(player)
+        if special:
+            lines.append(special)
+        if self._selected_special_for(ActionType.CLAIM) is not None:
+            selected = player.hand[self._selected_special_for(ActionType.CLAIM)].special
+            if selected == SpecialCardType.BLINDFOLD:
+                lines.append(f"Blindfold count: {self.blindfold_count}")
+        if not legal:
+            lines.append("No stronger claim exists. Challenge the stack.")
+        return lines
+
+    def _active_special_label(self, player: PlayerState) -> str:
+        if self.selected_special_index is None or self.selected_special_index >= player.hand_size:
+            return ""
+        special = player.hand[self.selected_special_index].special
+        if special is None:
+            return ""
+        return f"Special armed: {special.value}"
+
+    def _draw_button(self, button: UIButton, mouse_pos: tuple[int, int]) -> None:
+        hovered = button.rect.collidepoint(mouse_pos)
+        text_button = button.key in {
+            "confirm_claim",
+            "challenge",
+            "reset_selection",
+            "claim_prev",
+            "claim_next",
+        }
+        if text_button:
+            return
+        if button.enabled:
+            fill = (25, 29, 35, 210) if not hovered else (42, 49, 58, 220)
+            border = (225, 212, 192) if hovered else self.colors["gold"]
+            text_color = self.colors["text"]
+        else:
+            fill = (20, 22, 26, 168)
+            border = (91, 84, 76)
+            text_color = (111, 108, 104)
+        surface = pygame.Surface(button.rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(surface, fill, surface.get_rect(), border_radius=14)
+        pygame.draw.rect(surface, border, surface.get_rect(), 2, 14)
+        self.screen.blit(surface, button.rect.topleft)
+        font = self.fonts["small"]
+        if font.size(button.label)[0] > button.rect.width - 14:
+            font = self.fonts["tiny"]
+        label = font.render(button.label, True, text_color)
+        self.screen.blit(label, label.get_rect(center=button.rect.center))
+        if button.key == "claim_rank" and button.value == self.selected_claim_rank:
+            inner = button.rect.inflate(-12, -12)
+            pygame.draw.rect(self.screen, (219, 196, 133), inner, 2, 10)
+
+    def _draw_player_card(
+        self,
+        card: Card,
+        rect: pygame.Rect,
+        selected: bool,
+        hovered: bool,
+        angle: float = 0,
+    ) -> pygame.Rect:
+        card_rect = rect.move(0, -4) if hovered else rect
+        if card.is_special:
+            fill = (28, 34, 49)
+            border = self.colors["gold"]
+        else:
+            fill = self.colors["cream"]
+            border = (55, 47, 38)
+        surface = pygame.Surface(card_rect.size, pygame.SRCALPHA)
+        if selected:
+            glow = pygame.Surface((card_rect.width + 26, card_rect.height + 26), pygame.SRCALPHA)
+            pygame.draw.rect(glow, (215, 186, 120, 46), glow.get_rect(), border_radius=24)
+            glow_rect = glow.get_rect(center=card_rect.center)
+            self.screen.blit(glow, glow_rect)
+        pygame.draw.rect(surface, fill, surface.get_rect(), border_radius=18)
+        pygame.draw.rect(surface, border, surface.get_rect(), 2 if selected else 1, 18)
+        pygame.draw.rect(surface, (238, 231, 216), surface.get_rect().inflate(-10, -10), border_radius=14)
+        pygame.draw.rect(surface, (118, 97, 74), surface.get_rect().inflate(-12, -12), 1, 14)
+        self._draw_card_corner_ornaments(surface, card)
+        if card.is_special:
+            title = self.fonts["small"].render("SPECIAL", True, self.colors["gold"])
+            code = self.fonts["subtitle"].render(card.short_label, True, self.colors["text"])
+            name = self.fonts["tiny"].render(card.special.value, True, self.colors["gold"])
+            surface.blit(title, (12, 12))
+            surface.blit(code, code.get_rect(center=(card_rect.width // 2, card_rect.height // 2)))
+            surface.blit(name, name.get_rect(center=(card_rect.width // 2, card_rect.height - 18)))
+        else:
+            suit_color = self._card_suit_color(card.suit)
+            rank_text = self.fonts["card"].render(card.rank.label, True, suit_color)
+            bottom_rank = self.fonts["card"].render(card.rank.label, True, suit_color)
+            surface.blit(rank_text, (12, 10))
+            self._draw_suit_mark(surface, card.suit, (24, 50), 8, suit_color)
+            if card.rank in {Rank.JACK, Rank.QUEEN, Rank.KING}:
+                self._draw_face_card_art(surface, card, suit_color)
+            elif card.rank == Rank.ACE:
+                self._draw_suit_mark(
+                    surface,
+                    card.suit,
+                    (card_rect.width // 2, card_rect.height // 2 + 6),
+                    24,
+                    suit_color,
+                )
+            else:
+                self._draw_number_card(surface, card, suit_color)
+            bottom_rect = bottom_rank.get_rect(bottomright=(card_rect.width - 12, card_rect.height - 12))
+            surface.blit(bottom_rank, bottom_rect)
+            self._draw_suit_mark(surface, card.suit, (card_rect.width - 24, card_rect.height - 46), 8, suit_color)
+        if angle:
+            rotated = pygame.transform.rotate(surface, angle)
+            final_rect = rotated.get_rect(center=card_rect.center)
+            shadow = pygame.Surface((rotated.get_width() + 18, rotated.get_height() + 18), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (0, 0, 0, 38), shadow.get_rect())
+            self.screen.blit(shadow, shadow.get_rect(center=(final_rect.centerx + 6, final_rect.centery + 10)))
+            self.screen.blit(rotated, final_rect.topleft)
+            return final_rect
+        self.screen.blit(surface, card_rect.topleft)
+        return card_rect
+
+    def _draw_card_corner_ornaments(self, surface: pygame.Surface, card: Card) -> None:
+        inset = surface.get_rect().inflate(-18, -18)
+        pygame.draw.rect(surface, (168, 147, 120), inset, 1, 12)
+        if card.is_special:
+            return
+        accent = (194, 169, 130)
+        for cx, cy in (
+            (inset.left + 10, inset.top + 10),
+            (inset.right - 10, inset.top + 10),
+            (inset.left + 10, inset.bottom - 10),
+            (inset.right - 10, inset.bottom - 10),
+        ):
+            pygame.draw.circle(surface, accent, (cx, cy), 2)
+
+    def _card_suit_color(self, suit: Suit | None) -> tuple[int, int, int]:
+        if suit in {Suit.HEARTS, Suit.DIAMONDS}:
+            return (176, 56, 56)
+        return (39, 42, 48)
+
+    def _draw_number_card(
+        self,
+        surface: pygame.Surface,
+        card: Card,
+        color: tuple[int, int, int],
+    ) -> None:
+        layouts = {
+            Rank.SEVEN: [(0.34, 0.24), (0.66, 0.24), (0.34, 0.39), (0.66, 0.39), (0.34, 0.54), (0.66, 0.54), (0.5, 0.69)],
+            Rank.EIGHT: [(0.34, 0.22), (0.66, 0.22), (0.34, 0.36), (0.66, 0.36), (0.34, 0.5), (0.66, 0.5), (0.34, 0.64), (0.66, 0.64)],
+            Rank.NINE: [(0.34, 0.2), (0.66, 0.2), (0.34, 0.34), (0.66, 0.34), (0.5, 0.46), (0.34, 0.58), (0.66, 0.58), (0.34, 0.72), (0.66, 0.72)],
+            Rank.TEN: [(0.34, 0.19), (0.66, 0.19), (0.34, 0.31), (0.66, 0.31), (0.34, 0.44), (0.66, 0.44), (0.34, 0.57), (0.66, 0.57), (0.34, 0.7), (0.66, 0.7)],
+        }
+        positions = layouts.get(card.rank, [(0.5, 0.5)])
+        for px, py in positions:
+            self._draw_suit_mark(
+                surface,
+                card.suit,
+                (int(surface.get_width() * px), int(surface.get_height() * py)),
+                9,
+                color,
+            )
+
+    def _draw_face_card_art(
+        self,
+        surface: pygame.Surface,
+        card: Card,
+        color: tuple[int, int, int],
+    ) -> None:
+        width = surface.get_width()
+        height = surface.get_height()
+        panel = pygame.Rect(width // 2 - 26, 26, 52, height - 52)
+        accent = (230, 204, 142) if color[0] < 100 else (235, 186, 158)
+        pygame.draw.rect(surface, (244, 236, 219), panel, border_radius=14)
+        pygame.draw.rect(surface, color, panel, 2, 14)
+        pygame.draw.rect(surface, accent, panel.inflate(-16, -16), 1, 10)
+        for center_y, flip in ((58, 1), (height - 58, -1)):
+            face_center = (width // 2, center_y)
+            body_top = center_y + 16 * flip
+            head_color = (239, 214, 183)
+            pygame.draw.circle(surface, head_color, face_center, 10)
+            crown_points = [
+                (width // 2 - 16, center_y - 18 * flip),
+                (width // 2 - 6, center_y - 28 * flip),
+                (width // 2, center_y - 18 * flip),
+                (width // 2 + 6, center_y - 28 * flip),
+                (width // 2 + 16, center_y - 18 * flip),
+            ]
+            if card.rank == Rank.JACK:
+                crown_points = [
+                    (width // 2 - 14, center_y - 15 * flip),
+                    (width // 2, center_y - 25 * flip),
+                    (width // 2 + 14, center_y - 15 * flip),
+                ]
+            pygame.draw.lines(surface, accent, False, crown_points, 3)
+            collar = [
+                (width // 2 - 18, body_top + 6 * flip),
+                (width // 2, body_top - 4 * flip),
+                (width // 2 + 18, body_top + 6 * flip),
+            ]
+            pygame.draw.polygon(surface, (245, 238, 224), collar)
+            robe = [
+                (width // 2 - 18, body_top),
+                (width // 2 + 18, body_top),
+                (width // 2 + 24, body_top + 26 * flip),
+                (width // 2 - 24, body_top + 26 * flip),
+            ]
+            pygame.draw.polygon(surface, accent, robe)
+            chest = [
+                (width // 2 - 10, body_top + 6 * flip),
+                (width // 2 + 10, body_top + 6 * flip),
+                (width // 2 + 14, body_top + 18 * flip),
+                (width // 2 - 14, body_top + 18 * flip),
+            ]
+            pygame.draw.polygon(surface, color, chest)
+            pygame.draw.line(surface, accent, (width // 2, body_top + 2 * flip), (width // 2, body_top + 22 * flip), 2)
+            self._draw_suit_mark(surface, card.suit, (width // 2, center_y + 38 * flip), 9, color)
+
+    def _draw_suit_mark(
+        self,
+        surface: pygame.Surface,
+        suit: Suit | None,
+        center: tuple[int, int],
+        size: int,
+        color: tuple[int, int, int],
+    ) -> None:
+        x, y = center
+        if suit == Suit.HEARTS:
+            pygame.draw.circle(surface, color, (x - size // 2, y - size // 3), size // 2)
+            pygame.draw.circle(surface, color, (x + size // 2, y - size // 3), size // 2)
+            pygame.draw.polygon(surface, color, [(x - size, y - size // 6), (x + size, y - size // 6), (x, y + size)])
+        elif suit == Suit.DIAMONDS:
+            pygame.draw.polygon(surface, color, [(x, y - size), (x + size, y), (x, y + size), (x - size, y)])
+        elif suit == Suit.CLUBS:
+            pygame.draw.circle(surface, color, (x, y - size // 2), size // 2)
+            pygame.draw.circle(surface, color, (x - size // 2, y + size // 6), size // 2)
+            pygame.draw.circle(surface, color, (x + size // 2, y + size // 6), size // 2)
+            pygame.draw.rect(surface, color, pygame.Rect(x - size // 5, y + size // 5, size // 2, size))
+        elif suit == Suit.SPADES:
+            pygame.draw.circle(surface, color, (x - size // 2, y), size // 2)
+            pygame.draw.circle(surface, color, (x + size // 2, y), size // 2)
+            pygame.draw.polygon(surface, color, [(x - size, y + size // 3), (x + size, y + size // 3), (x, y - size)])
+            pygame.draw.rect(surface, color, pygame.Rect(x - size // 5, y + size // 3, size // 2, size))
+
+    def _draw_card_back(self, rect: pygame.Rect, highlighted: bool, angle: float = 0) -> None:
+        surface = self.assets.card_back((rect.width, rect.height), highlighted)
+        if angle:
+            rotated = pygame.transform.rotate(surface, angle)
+            self.screen.blit(rotated, rotated.get_rect(center=rect.center))
+            return
+        self.screen.blit(surface, rect.topleft)
+
+    def _draw_table_props(self, table_rect: pygame.Rect) -> None:
+        self._draw_revolver((table_rect.x + 162, table_rect.y + 154), 12, 1.1)
+        self._draw_revolver((table_rect.x + 332, table_rect.y + 94), 4, 1.02)
+        self._draw_revolver((table_rect.centerx + 8, table_rect.y + 34), -4, 0.96)
+        self._draw_revolver((table_rect.right - 248, table_rect.y + 104), -14, 1.04)
+        self._draw_revolver((table_rect.right - 156, table_rect.bottom - 16), -34, 1.72)
+
+    def _draw_revolver(
+        self,
+        center: tuple[int, int],
+        angle: float,
+        scale: float,
+    ) -> None:
+        width = int(214 * scale)
+        height = int(104 * scale)
+        surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        barrel = pygame.Rect(int(width * 0.06), int(height * 0.4), int(width * 0.46), int(height * 0.12))
+        pygame.draw.rect(surface, (24, 25, 29), barrel, border_radius=5)
+        muzzle = pygame.Rect(barrel.x - int(width * 0.04), barrel.y + 2, int(width * 0.07), barrel.height - 4)
+        pygame.draw.rect(surface, (32, 33, 38), muzzle, border_radius=4)
+        top_bar = pygame.Rect(int(width * 0.14), int(height * 0.31), int(width * 0.38), int(height * 0.1))
+        pygame.draw.rect(surface, (46, 48, 54), top_bar, border_radius=4)
+        pygame.draw.rect(surface, (60, 63, 70), pygame.Rect(top_bar.x + 10, top_bar.y + 2, top_bar.width - 10, top_bar.height - 4), border_radius=3)
+        pygame.draw.circle(surface, (54, 55, 60), (int(width * 0.53), int(height * 0.45)), int(height * 0.17))
+        pygame.draw.circle(surface, (27, 28, 32), (int(width * 0.53), int(height * 0.45)), int(height * 0.08))
+        for idx in range(6):
+            theta = math.tau * idx / 6
+            hole_x = int(width * 0.53 + math.cos(theta) * height * 0.08)
+            hole_y = int(height * 0.45 + math.sin(theta) * height * 0.08)
+            pygame.draw.circle(surface, (31, 32, 37), (hole_x, hole_y), max(2, int(height * 0.018)))
+        frame = [
+            (int(width * 0.42), int(height * 0.28)),
+            (int(width * 0.64), int(height * 0.29)),
+            (int(width * 0.69), int(height * 0.44)),
+            (int(width * 0.61), int(height * 0.66)),
+            (int(width * 0.45), int(height * 0.63)),
+        ]
+        pygame.draw.polygon(surface, (39, 40, 45), frame)
+        pygame.draw.arc(surface, (27, 28, 32), pygame.Rect(int(width * 0.47), int(height * 0.4), int(width * 0.2), int(height * 0.34)), 1.35, 4.3, 5)
+        trigger = [
+            (int(width * 0.56), int(height * 0.46)),
+            (int(width * 0.6), int(height * 0.54)),
+            (int(width * 0.57), int(height * 0.59)),
+            (int(width * 0.53), int(height * 0.54)),
+        ]
+        pygame.draw.polygon(surface, (74, 74, 78), trigger)
+        grip = [
+            (int(width * 0.67), int(height * 0.52)),
+            (int(width * 0.92), int(height * 0.64)),
+            (int(width * 0.82), int(height * 0.98)),
+            (int(width * 0.62), int(height * 0.8)),
+        ]
+        pygame.draw.polygon(surface, (114, 74, 45), grip)
+        pygame.draw.polygon(surface, (140, 92, 55), [(int(width * 0.69), int(height * 0.58)), (int(width * 0.89), int(height * 0.68)), (int(width * 0.82), int(height * 0.92)), (int(width * 0.66), int(height * 0.78))])
+        rotated = pygame.transform.rotozoom(surface, angle, 1)
+        shadow = pygame.Surface((rotated.get_width() + 18, rotated.get_height() + 18), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 54), shadow.get_rect())
+        shadow_rect = shadow.get_rect(center=(center[0] + 10, center[1] + 12))
+        self.screen.blit(shadow, shadow_rect)
+        self.screen.blit(rotated, rotated.get_rect(center=center))
+
+    def _draw_wrapped_text(
+        self,
+        lines: list[str],
+        rect: pygame.Rect,
+        font: pygame.font.Font,
+        color: tuple[int, int, int],
+    ) -> None:
+        y = rect.y
+        for raw_line in lines:
+            wrapped = self._wrap_line(raw_line, font, rect.width)
+            if not wrapped:
+                y += font.get_linesize() // 2
+                continue
+            for line in wrapped:
+                surface = font.render(line, True, color)
+                self.screen.blit(surface, (rect.x, y))
+                y += font.get_linesize()
+            y += 2
+            if y > rect.bottom:
+                return
+
+    def _wrap_line(
+        self,
+        text: str,
+        font: pygame.font.Font,
+        width: int,
+    ) -> list[str]:
+        if not text:
+            return []
+        words = text.split()
+        if not words:
+            return [text]
+        lines: list[str] = []
+        current = words[0]
+        for word in words[1:]:
+            candidate = f"{current} {word}"
+            if font.size(candidate)[0] <= width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+        return lines
+
+    def _reputation_color(self, band: ReputationBand) -> tuple[int, int, int]:
+        mapping = {
+            ReputationBand.TRUSTED: (117, 176, 122),
+            ReputationBand.NEUTRAL: (170, 150, 109),
+            ReputationBand.SUSPECT: (192, 127, 88),
+            ReputationBand.NOTORIOUS: (188, 73, 67),
+        }
+        return mapping[band]

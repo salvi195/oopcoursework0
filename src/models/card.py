@@ -46,6 +46,10 @@ class Rank(IntEnum):
             Rank.ACE: "A",
         }[self]
 
+    @property
+    def label(self) -> str:
+        return self.short_label
+
 
 class SpecialCardType(str, Enum):
     BLINDFOLD = "blindfold"
@@ -79,12 +83,20 @@ class ClaimRank(IntEnum):
     STRAIGHT_FLUSH = 9
     ROYAL_FLUSH = 10
 
+    @property
+    def label(self) -> str:
+        return self.name.replace("_", " ").title()
+
 
 @dataclass(frozen=True, slots=True)
 class Claim:
     rank: ClaimRank
     declared_by: str
     card_count: int
+
+    @property
+    def display_text(self) -> str:
+        return self.rank.label
 
 
 @dataclass(frozen=True, slots=True)

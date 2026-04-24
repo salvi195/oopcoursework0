@@ -10,7 +10,7 @@ from constants import (
     STARTING_HAND_SIZE,
 )
 from src.actors.ai_profiles import DEALER_PROFILE, get_opponent_profiles
-from src.actors.strategy import StrategyFactory
+from src.actors.strategy import AIContext, StrategyFactory
 from src.models.action import ActionResult, ActionType, TurnAction
 from src.models.card import Card, Claim, ClaimRank, Deck, SpecialCardType
 from src.models.evaluator import claim_is_truthful
@@ -138,6 +138,38 @@ class GameEngine:
             player.shield_charges = 0
         for strategy in self.ai_strategies.values():
             strategy.on_round_started()
+
+    def boot_summary(self) -> str:
+        state = self._require_state()
+        names = ", ".join(player.name for player in state.players)
+        return f"Round {state.round_number} begins with {names} at the table."
+
+    def current_player(self) -> PlayerState:
+        state = self._require_state()
+        return state.players[state.current_turn_index]
+
+    def is_match_over(self) -> bool:
+        return self._winner_name() is not None
+
+    def winner(self) -> PlayerState | None:
+        state = self._require_state()
+        remaining = [player for player in state.players if not player.eliminated]
+        return remaining[0] if len(remaining) == 1 else None
+
+    def legal_claim_ranks(self) -> list[ClaimRank]:
+        state = self._require_state()
+        if state.current_claim is None:
+            return list(ClaimRank)
+        return [rank for rank in ClaimRank if rank > state.current_claim.rank]
+
+    def player_can_make_claim(self, player: PlayerState) -> bool:
+        return player.claimable_hand_size > 0 or bool(player.special_cards())
+
+    def choose_ai_action(self, player: PlayerState) -> TurnAction:
+        strategy = self.ai_strategies.get(player.seat_index)
+        if strategy is None:
+            raise ValueError(f"No AI strategy for {player.name}.")
+        return strategy.choose_action(self._build_ai_context(player))
 
     def process_action(self, player: PlayerState, action: TurnAction) -> ActionResult:
         if action.action_type == ActionType.CLAIM:
@@ -383,6 +415,30 @@ class GameEngine:
     def _notify_ai(self, turn_record: TurnRecord) -> None:
         for strategy in self.ai_strategies.values():
             strategy.observe_turn(turn_record)
+
+    def _build_ai_context(self, player: PlayerState) -> AIContext:
+        state = self._require_state()
+        claimant = (
+            state.players[state.current_claimant_index]
+            if state.current_claimant_index is not None
+            else None
+        )
+        opponents = tuple(
+            opponent
+            for opponent in state.players
+            if opponent.seat_index != player.seat_index and not opponent.eliminated
+        )
+        return AIContext(
+            player=player,
+            opponents=opponents,
+            current_claim=state.current_claim,
+            current_claimant=claimant,
+            claim_stack_size=len(state.claim_stack),
+            round_number=state.round_number,
+            turn_history=tuple(state.turn_history),
+            public_memory_log=tuple(state.public_memory_log),
+            available_claim_ranks=tuple(self.legal_claim_ranks()),
+        )
 
     def _next_active_seat(self, current_seat: int) -> int:
         state = self._require_state()
