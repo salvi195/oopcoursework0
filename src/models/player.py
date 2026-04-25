@@ -53,6 +53,12 @@ class TurnRecord:
     bullet_target_name: str | None = None
     bullets_resolved: int = 0
     challenge_successful: bool | None = None
+    bullet_results: list[str] = field(default_factory=list)
+    bullet_chambers: list[int | None] = field(default_factory=list)
+    bullet_shields: list[bool] = field(default_factory=list)
+    bullet_eliminations: list[bool] = field(default_factory=list)
+    bullet_chances: list[int] = field(default_factory=list)
+    reputation_deltas: dict[str, int] = field(default_factory=dict)
     ghost_mode: bool = False
 
 

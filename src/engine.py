@@ -319,11 +319,19 @@ class GameEngine:
             summary_parts.append("Double Down forces two bullet spins.")
 
         outcomes: list[BulletOutcome] = []
+        bullet_chances: list[int] = []
         for _ in range(bullet_spins):
+            bullet_chances.append(self._loaded_chance_percent(bullet_target))
             outcome = bullet_target.resolve_bullet(self.rng)
             outcomes.append(outcome)
             if outcome.eliminated:
                 break
+
+        reputation_deltas = self._apply_challenge_reputation(
+            challenger=player,
+            claimant=claimant,
+            challenge_successful=challenge_successful,
+        )
 
         state.turn_history.append(
             TurnRecord(
@@ -331,6 +339,9 @@ class GameEngine:
                 actor_name=player.name,
                 action=ActionType.CHALLENGE.value,
                 actor_profile_key=player.profile_key,
+                claim_text=state.current_claim.rank.name,
+                claim_rank_value=int(state.current_claim.rank),
+                card_count=state.current_claim.card_count,
                 presentation_style=action.presentation_style.value,
                 reputation_band=player.reputation_band.value,
                 special_used=special.value if special is not None else None,
@@ -338,6 +349,12 @@ class GameEngine:
                 bullet_target_name=bullet_target.name,
                 bullets_resolved=len(outcomes),
                 challenge_successful=challenge_successful,
+                bullet_results=[outcome.result.value for outcome in outcomes],
+                bullet_chambers=[outcome.chamber_index for outcome in outcomes],
+                bullet_shields=[outcome.shield_used for outcome in outcomes],
+                bullet_eliminations=[outcome.eliminated for outcome in outcomes],
+                bullet_chances=bullet_chances,
+                reputation_deltas=reputation_deltas,
                 ghost_mode=action.ghost_mode,
             )
         )
@@ -411,6 +428,37 @@ class GameEngine:
                 text=self.rng.choice(lines),
             )
         )
+
+    def _loaded_chance_percent(self, player: PlayerState) -> int:
+        if player.shield_charges > 0:
+            return 0
+        available = player.revolver.available_indices()
+        if not available:
+            return 0
+        loaded = sum(
+            1
+            for index in available
+            if player.revolver.chambers[index].value == "loaded"
+        )
+        return round(loaded / len(available) * 100)
+
+    def _apply_challenge_reputation(
+        self,
+        *,
+        challenger: PlayerState,
+        claimant: PlayerState,
+        challenge_successful: bool,
+    ) -> dict[str, int]:
+        changes = {
+            challenger.name: 10 if challenge_successful else -12,
+            claimant.name: -14 if challenge_successful else 6,
+        }
+        applied: dict[str, int] = {}
+        for player in (challenger, claimant):
+            before = player.reputation
+            player.change_reputation(changes[player.name])
+            applied[player.name] = player.reputation - before
+        return applied
 
     def _notify_ai(self, turn_record: TurnRecord) -> None:
         for strategy in self.ai_strategies.values():

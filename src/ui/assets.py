@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pygame
 
-FRINGE_CACHE_VERSION = "fringe_v6"
+FRINGE_CACHE_VERSION = "fringe_v8"
 
 
 def build_label(text: str, fallback: str = "Unknown") -> str:
@@ -69,7 +70,7 @@ class AssetLibrary:
                 name,
                 size,
                 remove_checkerboard=True,
-                remove_white_fringe=True,
+                remove_white_fringe=key != "fox",
             )
             if image is not None:
                 return image
@@ -88,12 +89,46 @@ class AssetLibrary:
     ) -> pygame.Surface:
         surface = pygame.Surface(size, pygame.SRCALPHA)
         rect = surface.get_rect()
-        fill = (53, 39, 42) if not highlighted else (76, 53, 48)
+        fill = (58, 7, 24) if not highlighted else (82, 17, 28)
         border = self.colors.get("gold", (207, 175, 102))
         pygame.draw.rect(surface, fill, rect, border_radius=8)
-        pygame.draw.rect(surface, border, rect, 3, border_radius=8)
-        pygame.draw.rect(surface, (19, 23, 28), rect.inflate(-20, -20), 2, 6)
+        pygame.draw.rect(surface, border, rect, 2, border_radius=8)
+        pygame.draw.rect(surface, (132, 85, 45), rect.inflate(-12, -12), 1, 6)
+        center = rect.center
+        radius = max(10, min(rect.width, rect.height) // 5)
+        pygame.draw.circle(surface, (222, 164, 67), center, radius, 4)
+        for index in range(6):
+            theta = -3.14159 / 2 + 6.28318 * index / 6
+            hole = (
+                int(center[0] + math.cos(theta) * radius * 0.58),
+                int(center[1] + math.sin(theta) * radius * 0.58),
+            )
+            pygame.draw.circle(surface, (47, 7, 18), hole, max(3, radius // 5))
+            pygame.draw.circle(surface, (244, 198, 105), hole, max(3, radius // 5), 1)
         return surface
+
+    def card_face(
+        self,
+        rank_label: str,
+        suit_name: str,
+        size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        asset_name = f"{rank_label.lower()}_{suit_name.lower()}"
+        cache_key = (f"card_face:{asset_name}", size, False, False)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        path = self.asset_dir / "cards" / f"{asset_name}.png"
+        if not path.exists():
+            self._cache[cache_key] = None
+            return None
+
+        source = pygame.image.load(path).convert_alpha()
+        source = self._crop_card_source(source)
+        scaled = pygame.transform.smoothscale(source, size)
+        self._mask_card_corners(scaled)
+        self._cache[cache_key] = scaled
+        return scaled
 
     def character(
         self,
@@ -111,7 +146,7 @@ class AssetLibrary:
                 name,
                 size,
                 remove_checkerboard=True,
-                remove_white_fringe=True,
+                remove_white_fringe=profile_key != "fox",
             )
             if image is not None:
                 return image
@@ -137,6 +172,8 @@ class AssetLibrary:
                     remove_checkerboard=remove_checkerboard,
                     remove_white_fringe=remove_white_fringe,
                 )
+                if image is None:
+                    continue
 
                 scaled = pygame.transform.smoothscale(image, size)
                 if remove_checkerboard:
@@ -156,15 +193,20 @@ class AssetLibrary:
         *,
         remove_checkerboard: bool,
         remove_white_fringe: bool,
-    ) -> pygame.Surface:
+    ) -> pygame.Surface | None:
         if not remove_checkerboard and not remove_white_fringe:
-            return pygame.image.load(path).convert_alpha()
+            return self._load_surface(path)
 
         cache_path = self._clean_cache_path(path)
         if self._clean_cache_is_current(path, cache_path):
-            return pygame.image.load(cache_path).convert_alpha()
+            cached = self._load_surface(cache_path)
+            if cached is not None:
+                return cached
+            self._discard_clean_cache(cache_path)
 
-        image = pygame.image.load(path).convert_alpha()
+        image = self._load_surface(path)
+        if image is None:
+            return None
         if remove_checkerboard:
             self._remove_edge_checkerboard(image)
         if remove_white_fringe:
@@ -172,8 +214,23 @@ class AssetLibrary:
         self._remove_asset_white_spots(image, path.stem)
         self._clear_transparent_pixels(image)
         self.cleaned_asset_dir.mkdir(parents=True, exist_ok=True)
-        pygame.image.save(image, cache_path)
+        try:
+            pygame.image.save(image, cache_path)
+        except (OSError, pygame.error):
+            pass
         return image
+
+    def _load_surface(self, path: Path) -> pygame.Surface | None:
+        try:
+            return pygame.image.load(path).convert_alpha()
+        except (OSError, pygame.error, ValueError):
+            return None
+
+    def _discard_clean_cache(self, cache_path: Path) -> None:
+        try:
+            cache_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def _clean_cache_path(self, path: Path) -> Path:
         return self.cleaned_asset_dir / f"{path.stem}_{FRINGE_CACHE_VERSION}.png"
@@ -182,6 +239,46 @@ class AssetLibrary:
         if not cache_path.exists():
             return False
         return cache_path.stat().st_mtime >= source_path.stat().st_mtime
+
+    def _crop_card_source(self, surface: pygame.Surface) -> pygame.Surface:
+        width, height = surface.get_size()
+        xs: list[int] = []
+        ys: list[int] = []
+        for x in range(width):
+            for y in range(height):
+                color = surface.get_at((x, y))
+                if self._is_card_source_pixel(color):
+                    xs.append(x)
+                    ys.append(y)
+
+        if not xs or not ys:
+            return surface
+
+        pad = 6
+        left = max(0, min(xs) - pad)
+        top = max(0, min(ys) - pad)
+        right = min(width, max(xs) + pad + 1)
+        bottom = min(height, max(ys) + pad + 1)
+        if right - left < width * 0.45 or bottom - top < height * 0.45:
+            return surface
+        return surface.subsurface(pygame.Rect(left, top, right - left, bottom - top)).copy()
+
+    def _is_card_source_pixel(self, color: pygame.Color) -> bool:
+        if color.a < 20:
+            return False
+        channels = (color.r, color.g, color.b)
+        if min(channels) < 215:
+            return True
+        if color.r > 120 and color.g < 150 and color.b < 150:
+            return True
+        return False
+
+    def _mask_card_corners(self, surface: pygame.Surface) -> None:
+        rect = surface.get_rect()
+        radius = max(6, int(min(rect.size) * 0.09))
+        mask = pygame.Surface(rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(mask, (255, 255, 255, 255), rect, border_radius=radius)
+        surface.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
     def remove_fringe(self, surface: pygame.Surface) -> pygame.Surface:
         """
@@ -193,6 +290,18 @@ class AssetLibrary:
         if width == 0 or height == 0:
             return surface
 
+        self._remove_near_transparent_light_pixels(surface, radius=7, alpha_cutoff=245)
+        self._peel_light_edge(surface, passes=3)
+        return surface
+
+    def _remove_near_transparent_light_pixels(
+        self,
+        surface: pygame.Surface,
+        *,
+        radius: int,
+        alpha_cutoff: int,
+    ) -> None:
+        width, height = surface.get_size()
         fringe_pixels: list[tuple[int, int]] = []
         for x in range(width):
             for y in range(height):
@@ -201,15 +310,14 @@ class AssetLibrary:
                     continue
                 if not self._is_light_fringe_pixel(r, g, b):
                     continue
-                if a < 230 or self._has_nearby_transparency(surface, x, y, radius=4):
+                if a < alpha_cutoff or self._has_nearby_transparency(surface, x, y, radius=radius):
                     fringe_pixels.append((x, y))
 
         for x, y in fringe_pixels:
             surface.set_at((x, y), (0, 0, 0, 0))
-        return surface
 
-    def _peel_light_edge(self, surface: pygame.Surface) -> None:
-        for _ in range(2):
+    def _peel_light_edge(self, surface: pygame.Surface, *, passes: int = 2) -> None:
+        for _ in range(passes):
             edge_pixels: list[tuple[int, int]] = []
             width, height = surface.get_size()
             for x in range(width):
@@ -246,6 +354,11 @@ class AssetLibrary:
     def _remove_asset_white_spots(self, surface: pygame.Surface, asset_name: str) -> None:
         if asset_name == "revolver":
             self._remove_near_white_pixels(surface)
+        elif asset_name == "table":
+            self._remove_near_white_pixels(surface)
+        elif asset_name == "character_ash":
+            self._remove_near_transparent_light_pixels(surface, radius=9, alpha_cutoff=250)
+            self._peel_light_edge(surface, passes=2)
         elif asset_name == "character_mr_fold":
             self._remove_near_white_pixels(surface, min_y_ratio=0.45)
 
@@ -341,4 +454,4 @@ class AssetLibrary:
         if color.a < 20:
             return True
         channels = (color.r, color.g, color.b)
-        return min(channels) >= 225 and max(channels) - min(channels) <= 10
+        return min(channels) >= 218 and max(channels) - min(channels) <= 28

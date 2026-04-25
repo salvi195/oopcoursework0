@@ -26,6 +26,10 @@ def build_theme(asset_dir: Path) -> GameTheme:
     body_bold_font = pygame.font.SysFont("segoe ui", 28, bold=True)
     small_font = pygame.font.SysFont("segoe ui", 20)
     tiny_font = pygame.font.SysFont("segoe ui", 16)
+    card_font = pygame.font.SysFont("arial", 30, bold=True)
+    card_corner_font = pygame.font.SysFont("arial", 34, bold=True)
+    card_face_font = pygame.font.SysFont("georgia", 48, bold=True)
+    special_card_font = pygame.font.SysFont("agency fb", 24, bold=True)
     return GameTheme(
         colors={
             "bg": TABLE_BACKGROUND,
@@ -52,7 +56,10 @@ def build_theme(asset_dir: Path) -> GameTheme:
             "hud_title": pygame.font.SysFont("agency fb", 38, bold=True),
             "hud_body": pygame.font.SysFont("agency fb", 27, bold=True),
             "hud_small": pygame.font.SysFont("agency fb", 20, bold=True),
-            "card": pygame.font.SysFont("georgia", 28, bold=True),
+            "card": card_font,
+            "card_corner": card_corner_font,
+            "card_face": card_face_font,
+            "special_card": special_card_font,
         },
         profile_colors={
             "dante": (172, 67, 58),
