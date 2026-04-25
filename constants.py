@@ -58,14 +58,14 @@ DEALER_EVENT_LINES = {
         "A still man becomes a threat all at once.",
     ),
     "dante_overbluff_death": (
-        "Dante leaned too hard on a bad lie and paid for it.",
-        "The Bluffer finally believed his own story.",
-        "Dante died the only way he ever meant to live: overcommitted.",
+        "The Pig leaned too hard on a bad lie and paid for it.",
+        "The Pig finally believed his own story.",
+        "The Pig lost the only way he ever meant to play: overcommitted.",
     ),
     "fox_theatrical_challenge": (
-        "The Fox made a performance out of doubt.",
+        "The Bunny made a performance out of doubt.",
         "Even the challenge was staged for applause.",
-        "The Fox called it like he was stepping into spotlight.",
+        "The Bunny called it like she was stepping into spotlight.",
     ),
     "mirror_damage": (
         "The mirror does not forgive a bad read.",

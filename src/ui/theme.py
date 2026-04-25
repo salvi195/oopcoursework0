@@ -17,6 +17,15 @@ class GameTheme:
 
 def build_theme(asset_dir: Path) -> GameTheme:
     del asset_dir
+    title_font = pygame.font.SysFont("georgia", 82, bold=True)
+    neon_font = pygame.font.SysFont("agency fb", 104, bold=True)
+    menu_font = pygame.font.SysFont("agency fb", 42, bold=True)
+    menu_small_font = pygame.font.SysFont("agency fb", 26, bold=True)
+    display_font = pygame.font.SysFont("palatino linotype", 34, italic=True)
+    body_font = pygame.font.SysFont("segoe ui", 26)
+    body_bold_font = pygame.font.SysFont("segoe ui", 28, bold=True)
+    small_font = pygame.font.SysFont("segoe ui", 20)
+    tiny_font = pygame.font.SysFont("segoe ui", 16)
     return GameTheme(
         colors={
             "bg": TABLE_BACKGROUND,
@@ -30,17 +39,20 @@ def build_theme(asset_dir: Path) -> GameTheme:
             "felt": TABLE_FELT,
         },
         fonts={
-            "title": pygame.font.Font(None, 76),
-            "subtitle": pygame.font.Font(None, 34),
-            "dealer": pygame.font.Font(None, 30),
-            "body": pygame.font.Font(None, 28),
-            "body_bold": pygame.font.Font(None, 30),
-            "small": pygame.font.Font(None, 22),
-            "tiny": pygame.font.Font(None, 18),
-            "hud_title": pygame.font.Font(None, 34),
-            "hud_body": pygame.font.Font(None, 26),
-            "hud_small": pygame.font.Font(None, 20),
-            "card": pygame.font.Font(None, 30),
+            "title": title_font,
+            "neon": neon_font,
+            "menu": menu_font,
+            "menu_small": menu_small_font,
+            "subtitle": display_font,
+            "dealer": display_font,
+            "body": body_font,
+            "body_bold": body_bold_font,
+            "small": small_font,
+            "tiny": tiny_font,
+            "hud_title": pygame.font.SysFont("agency fb", 38, bold=True),
+            "hud_body": pygame.font.SysFont("agency fb", 27, bold=True),
+            "hud_small": pygame.font.SysFont("agency fb", 20, bold=True),
+            "card": pygame.font.SysFont("georgia", 28, bold=True),
         },
         profile_colors={
             "dante": (172, 67, 58),

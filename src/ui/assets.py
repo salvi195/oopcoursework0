@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pygame
 
+FRINGE_CACHE_VERSION = "fringe_v6"
+
 
 def build_label(text: str, fallback: str = "Unknown") -> str:
     cleaned = text.strip()
@@ -22,6 +24,22 @@ class AssetLibrary:
         self.colors = colors
         self.profile_colors = profile_colors
         self.profile_lookup = profile_lookup
+        self.cleaned_asset_dir = self.asset_dir / ".cleaned"
+        self._cache: dict[tuple[str, tuple[int, int], bool, bool], pygame.Surface | None] = {}
+
+    def image(
+        self,
+        name: str,
+        size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        return self._load_image(name, size)
+
+    def transparent_image(
+        self,
+        name: str,
+        size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        return self._load_image(name, size, remove_checkerboard=True, remove_white_fringe=True)
 
     def background(
         self,
@@ -46,9 +64,15 @@ class AssetLibrary:
 
     def portrait(self, profile_key: str | None, size: tuple[int, int]) -> pygame.Surface:
         key = profile_key or "dealer"
-        image = self._load_image(key, size)
-        if image is not None:
-            return image
+        for name in (f"portrait_{key}", f"character_{key}", key):
+            image = self._load_image(
+                name,
+                size,
+                remove_checkerboard=True,
+                remove_white_fringe=True,
+            )
+            if image is not None:
+                return image
 
         color = self.profile_colors.get(key, self.colors.get("gold", (207, 175, 102)))
         surface = pygame.Surface(size, pygame.SRCALPHA)
@@ -71,14 +95,250 @@ class AssetLibrary:
         pygame.draw.rect(surface, (19, 23, 28), rect.inflate(-20, -20), 2, 6)
         return surface
 
+    def character(
+        self,
+        profile_key: str | None,
+        size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        if profile_key is None:
+            return None
+        for name in (
+            f"character_{profile_key}",
+            f"{profile_key}_table",
+            profile_key,
+        ):
+            image = self._load_image(
+                name,
+                size,
+                remove_checkerboard=True,
+                remove_white_fringe=True,
+            )
+            if image is not None:
+                return image
+        return None
+
     def _load_image(
         self,
         name: str,
         size: tuple[int, int],
+        *,
+        remove_checkerboard: bool = False,
+        remove_white_fringe: bool = False,
     ) -> pygame.Surface | None:
+        cache_key = (name, size, remove_checkerboard, remove_white_fringe)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
         for suffix in (".png", ".jpg", ".jpeg"):
             path = self.asset_dir / f"{name}{suffix}"
             if path.exists():
-                image = pygame.image.load(path).convert_alpha()
-                return pygame.transform.smoothscale(image, size)
+                image = self._load_clean_source(
+                    path,
+                    remove_checkerboard=remove_checkerboard,
+                    remove_white_fringe=remove_white_fringe,
+                )
+
+                scaled = pygame.transform.smoothscale(image, size)
+                if remove_checkerboard:
+                    self._remove_edge_checkerboard(scaled)
+                if remove_white_fringe:
+                    scaled = self.remove_fringe(scaled)
+                self._remove_asset_white_spots(scaled, path.stem)
+                self._clear_transparent_pixels(scaled)
+                self._cache[cache_key] = scaled
+                return scaled
+        self._cache[cache_key] = None
         return None
+
+    def _load_clean_source(
+        self,
+        path: Path,
+        *,
+        remove_checkerboard: bool,
+        remove_white_fringe: bool,
+    ) -> pygame.Surface:
+        if not remove_checkerboard and not remove_white_fringe:
+            return pygame.image.load(path).convert_alpha()
+
+        cache_path = self._clean_cache_path(path)
+        if self._clean_cache_is_current(path, cache_path):
+            return pygame.image.load(cache_path).convert_alpha()
+
+        image = pygame.image.load(path).convert_alpha()
+        if remove_checkerboard:
+            self._remove_edge_checkerboard(image)
+        if remove_white_fringe:
+            image = self.remove_fringe(image)
+        self._remove_asset_white_spots(image, path.stem)
+        self._clear_transparent_pixels(image)
+        self.cleaned_asset_dir.mkdir(parents=True, exist_ok=True)
+        pygame.image.save(image, cache_path)
+        return image
+
+    def _clean_cache_path(self, path: Path) -> Path:
+        return self.cleaned_asset_dir / f"{path.stem}_{FRINGE_CACHE_VERSION}.png"
+
+    def _clean_cache_is_current(self, source_path: Path, cache_path: Path) -> bool:
+        if not cache_path.exists():
+            return False
+        return cache_path.stat().st_mtime >= source_path.stat().st_mtime
+
+    def remove_fringe(self, surface: pygame.Surface) -> pygame.Surface:
+        """
+        Removes white/light fringe pixels left after background removal.
+        Targets semi-transparent edge pixels that are too bright.
+        """
+        surface = surface.convert_alpha()
+        width, height = surface.get_size()
+        if width == 0 or height == 0:
+            return surface
+
+        fringe_pixels: list[tuple[int, int]] = []
+        for x in range(width):
+            for y in range(height):
+                r, g, b, a = surface.get_at((x, y))
+                if a == 0:
+                    continue
+                if not self._is_light_fringe_pixel(r, g, b):
+                    continue
+                if a < 230 or self._has_nearby_transparency(surface, x, y, radius=4):
+                    fringe_pixels.append((x, y))
+
+        for x, y in fringe_pixels:
+            surface.set_at((x, y), (0, 0, 0, 0))
+        return surface
+
+    def _peel_light_edge(self, surface: pygame.Surface) -> None:
+        for _ in range(2):
+            edge_pixels: list[tuple[int, int]] = []
+            width, height = surface.get_size()
+            for x in range(width):
+                for y in range(height):
+                    r, g, b, a = surface.get_at((x, y))
+                    if a == 0:
+                        continue
+                    if not self._is_bright_edge_cast(r, g, b):
+                        continue
+                    if self._touches_clear_alpha(surface, x, y):
+                        edge_pixels.append((x, y))
+
+            if not edge_pixels:
+                return
+            for x, y in edge_pixels:
+                surface.set_at((x, y), (0, 0, 0, 0))
+
+    def _is_bright_edge_cast(self, r: int, g: int, b: int) -> bool:
+        luminance = int(r * 0.299 + g * 0.587 + b * 0.114)
+        spread = max(r, g, b) - min(r, g, b)
+        if min(r, g, b) >= 225:
+            return True
+        if min(r, g, b) >= 185 and spread <= 28:
+            return True
+        return luminance >= 210 and spread <= 58
+
+    def _clear_transparent_pixels(self, surface: pygame.Surface) -> None:
+        width, height = surface.get_size()
+        for x in range(width):
+            for y in range(height):
+                if surface.get_at((x, y))[3] == 0:
+                    surface.set_at((x, y), (0, 0, 0, 0))
+
+    def _remove_asset_white_spots(self, surface: pygame.Surface, asset_name: str) -> None:
+        if asset_name == "revolver":
+            self._remove_near_white_pixels(surface)
+        elif asset_name == "character_mr_fold":
+            self._remove_near_white_pixels(surface, min_y_ratio=0.45)
+
+    def _remove_near_white_pixels(
+        self,
+        surface: pygame.Surface,
+        *,
+        min_y_ratio: float = 0.0,
+    ) -> None:
+        width, height = surface.get_size()
+        min_y = int(height * min_y_ratio)
+        for x in range(width):
+            for y in range(min_y, height):
+                r, g, b, a = surface.get_at((x, y))
+                if a == 0:
+                    continue
+                if min(r, g, b) >= 228 and max(r, g, b) - min(r, g, b) <= 48:
+                    surface.set_at((x, y), (0, 0, 0, 0))
+
+    def _is_light_fringe_pixel(self, r: int, g: int, b: int) -> bool:
+        lowest = min(r, g, b)
+        spread = max(r, g, b) - lowest
+        if lowest >= 215:
+            return True
+        return lowest >= 170 and spread <= 80
+
+    def _touches_clear_alpha(self, surface: pygame.Surface, x: int, y: int) -> bool:
+        width, height = surface.get_size()
+        for nx in range(max(0, x - 1), min(width, x + 2)):
+            for ny in range(max(0, y - 1), min(height, y + 2)):
+                if nx == x and ny == y:
+                    continue
+                if surface.get_at((nx, ny))[3] == 0:
+                    return True
+        return False
+
+    def _has_nearby_transparency(
+        self,
+        surface: pygame.Surface,
+        x: int,
+        y: int,
+        *,
+        radius: int,
+    ) -> bool:
+        width, height = surface.get_size()
+        for nx in range(max(0, x - radius), min(width, x + radius + 1)):
+            for ny in range(max(0, y - radius), min(height, y + radius + 1)):
+                if nx == x and ny == y:
+                    continue
+                if surface.get_at((nx, ny))[3] < 180:
+                    return True
+        return False
+
+    def _remove_edge_checkerboard(self, surface: pygame.Surface) -> None:
+        width, height = surface.get_size()
+        if width == 0 or height == 0:
+            return
+
+        visited = bytearray(width * height)
+        queue: list[tuple[int, int]] = []
+
+        def add(x: int, y: int) -> None:
+            if 0 <= x < width and 0 <= y < height:
+                index = y * width + x
+                if not visited[index]:
+                    queue.append((x, y))
+
+        for x in range(width):
+            add(x, 0)
+            add(x, height - 1)
+        for y in range(height):
+            add(0, y)
+            add(width - 1, y)
+
+        head = 0
+        while head < len(queue):
+            x, y = queue[head]
+            head += 1
+            index = y * width + x
+            if visited[index]:
+                continue
+            visited[index] = 1
+            color = surface.get_at((x, y))
+            if not self._is_checkerboard_pixel(color):
+                continue
+            surface.set_at((x, y), (0, 0, 0, 0))
+            add(x + 1, y)
+            add(x - 1, y)
+            add(x, y + 1)
+            add(x, y - 1)
+
+    def _is_checkerboard_pixel(self, color: pygame.Color) -> bool:
+        if color.a < 20:
+            return True
+        channels = (color.r, color.g, color.b)
+        return min(channels) >= 225 and max(channels) - min(channels) <= 10

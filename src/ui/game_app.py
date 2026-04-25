@@ -67,12 +67,13 @@ class BluffingGameApp:
         self.ai_due_at = 0
         self.turn_marker: tuple[int, int, int] | None = None
         self.profile_lookup = {profile.key: profile for profile in OPPONENT_PROFILES}
-        self.theme = build_theme(Path("assets"))
+        asset_dir = Path("assets")
+        self.theme = build_theme(asset_dir)
         self.colors = self.theme.colors
         self.fonts = self.theme.fonts
         self.profile_colors = self.theme.profile_colors
         self.assets = AssetLibrary(
-            Path("assets"),
+            asset_dir,
             self.colors,
             self.profile_colors,
             self.profile_lookup,
@@ -398,16 +399,16 @@ class BluffingGameApp:
         claim_hud = pygame.Rect(24, 14, 286, 132)
         move_hud = pygame.Rect(968, 14, 288, 158)
         control_rect = pygame.Rect(1000, 206, 244, 286)
-        table_rect = pygame.Rect(70, 324, 1140, 416)
+        table_rect = pygame.Rect(42, 420, 1196, 370)
         dealer_rect = pygame.Rect(338, 18, 604, 22)
-        hand_rect = pygame.Rect(250, 448, 780, 302)
+        hand_rect = pygame.Rect(250, 560, 780, 220)
         claim_buttons_top = control_rect.y + 18
         seat_positions = {
-            0: (table_rect.centerx, 646),
-            1: (164, 286),
-            2: (362, 198),
-            3: (table_rect.centerx, 146),
-            4: (1122, 286),
+            0: (table_rect.centerx, 690),
+            1: (190, 360),
+            2: (490, 238),
+            3: (790, 210),
+            4: (1090, 360),
         }
         return {
             "claim_hud": claim_hud,
@@ -423,22 +424,27 @@ class BluffingGameApp:
     def _draw_background(self, now: int) -> None:
         self.screen.fill(self.colors["bg"])
         if self.mode == "menu":
-            background = self.assets.background("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+            background = (
+                self.assets.image("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.background("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+            )
             if background is not None:
                 self.screen.blit(background, (0, 0))
             glow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            pulse = 18 + int(10 * (1 + pygame.math.Vector2(1, 0).rotate(now * 0.04).x))
-            pygame.draw.circle(glow, (73, 46, 58, 70), (220, 160), 230 + pulse)
-            pygame.draw.circle(
-                glow,
-                (25, 76, 68, 110),
-                (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2),
-                360,
-            )
-            pygame.draw.circle(glow, (108, 64, 44, 55), (SCREEN_WIDTH - 180, 210), 210)
+            pulse = 16 + int(8 * (1 + pygame.math.Vector2(1, 0).rotate(now * 0.03).x))
+            pygame.draw.circle(glow, (244, 171, 83, 40), (640, 180), 250 + pulse)
+            pygame.draw.rect(glow, (0, 0, 0, 68), pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
             self.screen.blit(glow, (0, 0))
         else:
-            self._draw_table_room_background(now)
+            background = (
+                self.assets.image("table_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+            )
+            if background is not None:
+                self.screen.blit(background, (0, 0))
+            else:
+                self._draw_table_room_background(now)
         vignette = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         pygame.draw.rect(vignette, (8, 8, 10, 62), vignette.get_rect(), 0, 0)
         pygame.draw.rect(
@@ -531,50 +537,59 @@ class BluffingGameApp:
         self.screen.blit(shadow, (0, 0))
 
     def _draw_menu(self, mouse_pos: tuple[int, int]) -> None:
-        title = self.fonts["title"].render(WINDOW_TITLE, True, self.colors["text"])
-        subtitle = self.fonts["dealer"].render(
-            "A staged room of trust, pressure, and bad timing.",
-            True,
-            self.colors["muted"],
-        )
-        self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, 132)))
-        self.screen.blit(subtitle, subtitle.get_rect(center=(SCREEN_WIDTH // 2, 176)))
-        self._draw_menu_gallery()
+        shade = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        shade.fill((10, 8, 7, 88))
+        pygame.draw.rect(shade, (0, 0, 0, 130), pygame.Rect(0, 0, 438, SCREEN_HEIGHT))
+        self.screen.blit(shade, (0, 0))
 
-        panel = pygame.Surface((680, 336), pygame.SRCALPHA)
-        pygame.draw.rect(panel, self.colors["panel"], panel.get_rect(), border_radius=28)
-        pygame.draw.rect(panel, (*self.colors["border"], 210), panel.get_rect(), 2, 28)
-        self.screen.blit(panel, (300, 258))
+        self._draw_neon_title(("LIAR'S", "BAR"), (88, 96))
 
         button_specs = [
-            ("menu_new", "Start New Match", True),
-            ("menu_resume", "Resume Latest Match", self.saved_summary is not None),
-            ("menu_quit", "Quit", True),
+            ("menu_new", "ENTER THE BAR", True),
+            ("menu_resume", "RESUME", self.saved_summary is not None),
+            ("menu_quit", "EXIT", True),
         ]
-        top = 332
+        top = 348
         for key, label, enabled in button_specs:
-            rect = pygame.Rect(430, top, 420, 54)
+            rect = pygame.Rect(82, top, 318, 54)
             button = UIButton(key=key, label=label, rect=rect, enabled=enabled)
             self.buttons.append(button)
-            self._draw_button(button, mouse_pos)
-            top += 70
+            self._draw_menu_option(button, mouse_pos, primary=key == "menu_new")
+            top += 66
 
         if self.saved_summary is not None:
+            alive_players = self._saved_alive_players()
             summary_lines = [
-                f"Latest checkpoint: round {self.saved_summary['round_number']}",
-                f"Alive players: {', '.join(self.saved_summary['alive_players'])}",
+                f"Saved round {self.saved_summary.get('round_number', '?')} is ready.",
+                f"Still seated: {len(alive_players) if alive_players else '?'}",
             ]
         else:
             summary_lines = [
-                "No saved checkpoint found yet.",
-                "Start a match and the game will create one after each turn.",
+                "No saved match yet.",
             ]
         self._draw_wrapped_text(
             summary_lines,
-            pygame.Rect(360, 558, 560, 62),
-            self.fonts["small"],
+            pygame.Rect(84, 560, 310, 70),
+            self.fonts["menu_small"],
             self.colors["muted"],
         )
+
+    def _saved_alive_players(self) -> list[str]:
+        if self.saved_summary is None:
+            return []
+        alive_players = self.saved_summary.get("alive_players")
+        if isinstance(alive_players, list):
+            return [str(name) for name in alive_players]
+        players = self.saved_summary.get("players", [])
+        if not isinstance(players, list):
+            return []
+        return [
+            str(player["name"])
+            for player in players
+            if isinstance(player, dict)
+            and not player.get("eliminated", False)
+            and "name" in player
+        ]
 
     def _draw_menu_gallery(self) -> None:
         portrait_size = (78, 96)
@@ -610,6 +625,89 @@ class BluffingGameApp:
             self._draw_button(button, mouse_pos)
         if self.engine.is_match_over():
             self._draw_end_overlay(mouse_pos)
+
+    def _draw_neon_title(
+        self,
+        lines: tuple[str, ...],
+        pos: tuple[int, int],
+    ) -> None:
+        x, y = pos
+        for line in lines:
+            self._blit_neon_text(self.fonts["neon"], line, (x, y))
+            y += self.fonts["neon"].get_linesize() - 18
+
+    def _blit_neon_text(
+        self,
+        font: pygame.font.Font,
+        text: str,
+        pos: tuple[int, int],
+    ) -> pygame.Rect:
+        glow_color = (255, 42, 31)
+        for radius, alpha in ((12, 28), (7, 48), (3, 92)):
+            glow = font.render(text, True, glow_color)
+            glow.set_alpha(alpha)
+            half = max(1, radius // 2)
+            for dx, dy in (
+                (-radius, 0),
+                (radius, 0),
+                (0, -radius),
+                (0, radius),
+                (-half, -half),
+                (half, -half),
+                (-half, half),
+                (half, half),
+            ):
+                self.screen.blit(glow, (pos[0] + dx, pos[1] + dy))
+
+        shadow = font.render(text, True, (84, 5, 5))
+        self.screen.blit(shadow, (pos[0] + 3, pos[1] + 4))
+        surface = font.render(text, True, (255, 72, 55))
+        rect = surface.get_rect(topleft=pos)
+        self.screen.blit(surface, rect)
+        hot_core = font.render(text, True, (255, 193, 146))
+        hot_core.set_alpha(92)
+        self.screen.blit(hot_core, (pos[0] + 1, pos[1] - 1))
+        return rect
+
+    def _draw_menu_option(
+        self,
+        button: UIButton,
+        mouse_pos: tuple[int, int],
+        *,
+        primary: bool = False,
+    ) -> None:
+        hovered = button.enabled and button.rect.collidepoint(mouse_pos)
+        highlighted = button.enabled and (primary or hovered)
+        font = self.fonts["menu"]
+        if highlighted:
+            color = self.colors["cream"]
+        elif button.enabled:
+            color = (183, 177, 168)
+        else:
+            color = (103, 99, 96)
+
+        shadow = font.render(button.label, True, (18, 11, 9))
+        shadow_rect = shadow.get_rect(midleft=(button.rect.x + 2, button.rect.centery + 2))
+        self.screen.blit(shadow, shadow_rect)
+        label = font.render(button.label, True, color)
+        label_rect = label.get_rect(midleft=(button.rect.x, button.rect.centery))
+        self.screen.blit(label, label_rect)
+
+        if highlighted:
+            line_y = label_rect.bottom + 6
+            line_end = min(button.rect.right, label_rect.right + 56)
+            pygame.draw.line(self.screen, self.colors["gold"], (label_rect.x, line_y), (line_end, line_y), 2)
+            diamond_x = label_rect.x + (line_end - label_rect.x) // 2
+            pygame.draw.polygon(
+                self.screen,
+                self.colors["gold"],
+                [
+                    (diamond_x, line_y - 6),
+                    (diamond_x + 6, line_y),
+                    (diamond_x, line_y + 6),
+                    (diamond_x - 6, line_y),
+                ],
+            )
 
     def _blit_shadow_text(
         self,
@@ -760,15 +858,15 @@ class BluffingGameApp:
         pygame.draw.line(
             self.screen,
             self.colors["text"],
-            (rect.x + 28, rect.y + 42),
-            (rect.right, rect.y + 42),
+            (rect.x + 28, rect.y + 48),
+            (rect.right, rect.y + 48),
             2,
         )
-        y = rect.y + 56
+        y = rect.y + 74
         for label, key in lines:
             if key:
                 key_rect = self._draw_keycap(key, (rect.right, y - 1))
-                label_right = key_rect.x - 20
+                label_right = key_rect.x - 26
             else:
                 label_right = rect.right
             self._blit_shadow_text(
@@ -778,7 +876,7 @@ class BluffingGameApp:
                 (label_right, y),
                 anchor="topright",
             )
-            y += 28
+            y += 39
         if self.status_message and player.is_human and not self.engine.is_match_over():
             status_font = self.fonts["hud_small"]
             status = self.status_message.upper()
@@ -791,6 +889,25 @@ class BluffingGameApp:
             )
 
     def _draw_table_surface(self, table_rect: pygame.Rect, now: int) -> None:
+        table_image = self.assets.transparent_image(
+            "table",
+            (table_rect.width + 110, table_rect.height + 80),
+        )
+        if table_image is not None:
+            table_pos = table_image.get_rect(center=table_rect.center)
+            self.screen.blit(table_image, table_pos)
+            center_ring = pygame.Rect(table_rect.centerx - 190, table_rect.centery - 86, 380, 172)
+            pygame.draw.ellipse(self.screen, (176, 210, 172), center_ring, 4)
+            inner_glow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            pulse = 14 + int(8 * (1 + pygame.math.Vector2(0, 1).rotate(now * 0.03).y))
+            pygame.draw.ellipse(
+                inner_glow,
+                (181, 220, 176, 14),
+                center_ring.inflate(pulse * 2, pulse),
+            )
+            self.screen.blit(inner_glow, (0, 0))
+            return
+
         shadow = table_rect.move(0, 26)
         pygame.draw.ellipse(self.screen, (13, 9, 8, 108), shadow)
         outer = table_rect.inflate(26, 26)
@@ -887,17 +1004,6 @@ class BluffingGameApp:
         if self.state is None:
             return
         player = self.state.players[0]
-        left_arm = [(376, 800), (420, 694), (498, 608), (546, 634), (486, 800)]
-        right_arm = [(864, 800), (842, 686), (900, 632), (980, 662), (1010, 800)]
-        pygame.draw.polygon(self.screen, (88, 54, 43), left_arm)
-        pygame.draw.polygon(self.screen, (103, 69, 52), right_arm)
-        pygame.draw.ellipse(self.screen, (60, 40, 31), pygame.Rect(444, 618, 118, 58))
-        pygame.draw.ellipse(self.screen, (72, 48, 37), pygame.Rect(864, 642, 126, 64))
-        player_badge = pygame.Rect(546, 722, 188, 32)
-        pygame.draw.rect(self.screen, (18, 20, 24, 190), player_badge, border_radius=16)
-        pygame.draw.rect(self.screen, (240, 228, 210), player_badge, 1, 16)
-        badge_text = self.fonts["small"].render("PLAYER", True, self.colors["text"])
-        self.screen.blit(badge_text, badge_text.get_rect(center=player_badge.center))
         special_label = self._active_special_label(player)
         if special_label:
             special_text = self.fonts["small"].render(special_label, True, self.colors["gold"])
@@ -910,8 +1016,8 @@ class BluffingGameApp:
             empty = self.fonts["body"].render("No cards left in hand.", True, self.colors["muted"])
             self.screen.blit(empty, empty.get_rect(center=(panel_rect.centerx, panel_rect.y + 70)))
             return
-        fan_center_x = 620
-        fan_center_y = 586
+        fan_center_x = 640
+        fan_center_y = 652
         spacing = 66
         card_width = 112
         card_height = 168
@@ -964,14 +1070,60 @@ class BluffingGameApp:
             return
         active = self.state.current_turn_index == player.seat_index
         claimant = self.state.current_claimant_index == player.seat_index
-        if player.seat_index == 3:
+        if self._draw_character_image(player, active, claimant):
+            return
+
+        profile_key = player.profile_key or ""
+        if profile_key == "mr_fold" or player.seat_index == 3:
             self._draw_bull_character(x, y, active, claimant, player.hand_size)
-        elif player.seat_index == 2:
+        elif profile_key in {"ash", "vesper"} or player.seat_index in {2, 4}:
             self._draw_wolf_character(x, y, active, claimant, player.hand_size)
-        elif player.seat_index == 1:
+        elif profile_key == "dante" or player.seat_index == 1:
             self._draw_pig_character(x, y, active, claimant, player.hand_size)
         else:
             self._draw_fox_character(x, y, active, claimant, player.hand_size)
+
+    def _draw_character_image(
+        self,
+        player: PlayerState,
+        active: bool,
+        claimant: bool,
+    ) -> bool:
+        layout = self._character_image_layout(player.seat_index)
+        if layout is None:
+            return False
+        size, midbottom, flip = layout
+        image = self.assets.character(player.profile_key, size)
+        if image is None:
+            return False
+
+        if player.profile_key == "fox":
+            midbottom = (midbottom[0], midbottom[1] - 60)
+        if flip:
+            image = pygame.transform.flip(image, True, False)
+        if player.eliminated:
+            image = image.copy()
+            image.set_alpha(82)
+
+        rect = image.get_rect(midbottom=midbottom)
+        shadow = pygame.Surface((rect.width, 64), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 52), shadow.get_rect())
+        self.screen.blit(shadow, shadow.get_rect(midbottom=(rect.centerx, rect.bottom + 12)))
+        self._draw_halo((rect.centerx, rect.y + rect.height // 3), rect.width // 3, active or claimant)
+        self.screen.blit(image, rect.topleft)
+        return True
+
+    def _character_image_layout(
+        self,
+        seat_index: int,
+    ) -> tuple[tuple[int, int], tuple[int, int], bool] | None:
+        layouts = {
+            1: ((330, 420), (190, 625), True),
+            2: ((286, 360), (490, 518), False),
+            3: ((350, 430), (790, 520), False),
+            4: ((330, 430), (1090, 650), False),
+        }
+        return layouts.get(seat_index)
 
     def _draw_pig_character(
         self,
@@ -1704,11 +1856,42 @@ class BluffingGameApp:
         self.screen.blit(surface, rect.topleft)
 
     def _draw_table_props(self, table_rect: pygame.Rect) -> None:
-        self._draw_revolver((table_rect.x + 162, table_rect.y + 154), 12, 1.1)
-        self._draw_revolver((table_rect.x + 332, table_rect.y + 94), 4, 1.02)
-        self._draw_revolver((table_rect.centerx + 8, table_rect.y + 34), -4, 0.96)
-        self._draw_revolver((table_rect.right - 248, table_rect.y + 104), -14, 1.04)
-        self._draw_revolver((table_rect.right - 156, table_rect.bottom - 16), -34, 1.72)
+        if self.state is None:
+            return
+        table_center = table_rect.center
+        for player in self.state.players:
+            center, scale = self._revolver_layout(player.seat_index, table_rect)
+            if player.seat_index == 3:
+                wolf_center, _ = self._revolver_layout(2, table_rect)
+                angle = self._angle_toward(wolf_center, table_center)
+            else:
+                angle = self._angle_toward(center, table_center)
+            self._draw_revolver(center, angle, scale)
+
+    def _revolver_layout(
+        self,
+        seat_index: int,
+        table_rect: pygame.Rect,
+    ) -> tuple[tuple[int, int], float]:
+        layouts = {
+            0: ((table_rect.right - 190, table_rect.bottom - 48), 1.08),
+            1: ((table_rect.x + 176, table_rect.y + 154), 0.96),
+            2: ((table_rect.x + 364, table_rect.y + 102), 0.9),
+            3: ((table_rect.centerx + 84, table_rect.y + 82), 0.92),
+            4: ((table_rect.right - 300, table_rect.y + 126), 0.96),
+        }
+        return layouts.get(seat_index, (table_rect.center, 0.94))
+
+    def _angle_toward(
+        self,
+        origin: tuple[int, int],
+        target: tuple[int, int],
+    ) -> float:
+        dx = target[0] - origin[0]
+        dy = target[1] - origin[1]
+        if dx == 0 and dy == 0:
+            return 0
+        return -math.degrees(math.atan2(dy, dx))
 
     def _draw_revolver(
         self,
@@ -1716,6 +1899,17 @@ class BluffingGameApp:
         angle: float,
         scale: float,
     ) -> None:
+        asset_size = (max(1, int(190 * scale)), max(1, int(142 * scale)))
+        asset = self.assets.transparent_image("revolver", asset_size)
+        if asset is not None:
+            rotated = pygame.transform.rotozoom(asset, angle, 1)
+            bounds = rotated.get_bounding_rect(min_alpha=8)
+            shadow = pygame.Surface((bounds.width + 26, bounds.height + 18), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (0, 0, 0, 52), shadow.get_rect())
+            self.screen.blit(shadow, shadow.get_rect(center=(center[0] + 8, center[1] + 10)))
+            self.screen.blit(rotated, rotated.get_rect(center=center))
+            return
+
         width = int(214 * scale)
         height = int(104 * scale)
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -1757,7 +1951,7 @@ class BluffingGameApp:
         ]
         pygame.draw.polygon(surface, (114, 74, 45), grip)
         pygame.draw.polygon(surface, (140, 92, 55), [(int(width * 0.69), int(height * 0.58)), (int(width * 0.89), int(height * 0.68)), (int(width * 0.82), int(height * 0.92)), (int(width * 0.66), int(height * 0.78))])
-        rotated = pygame.transform.rotozoom(surface, angle, 1)
+        rotated = pygame.transform.rotozoom(surface, angle + 180, 1)
         shadow = pygame.Surface((rotated.get_width() + 18, rotated.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.ellipse(shadow, (0, 0, 0, 54), shadow.get_rect())
         shadow_rect = shadow.get_rect(center=(center[0] + 10, center[1] + 12))

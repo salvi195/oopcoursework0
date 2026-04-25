@@ -17,6 +17,9 @@ class MatchSnapshotStore:
             "phase": state.phase.value,
             "dealer_index": state.dealer_index,
             "current_turn_index": state.current_turn_index,
+            "alive_players": [
+                player.name for player in state.players if not player.eliminated
+            ],
             "players": [
                 {
                     "name": player.name,

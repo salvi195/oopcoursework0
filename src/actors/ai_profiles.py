@@ -13,23 +13,19 @@ class AIProfile:
 OPPONENT_PROFILES: tuple[AIProfile, ...] = (
     AIProfile(
         key="dante",
-        display_name="Dante",
+        display_name="The Pig",
     ),
     AIProfile(
         key="ash",
-        display_name="Ash",
+        display_name="The Wolf",
     ),
     AIProfile(
         key="mr_fold",
-        display_name="Mr. Fold",
-    ),
-    AIProfile(
-        key="vesper",
-        display_name="Vesper",
+        display_name="The Bull",
     ),
     AIProfile(
         key="fox",
-        display_name="The Fox",
+        display_name="The Bunny",
     ),
 )
 
