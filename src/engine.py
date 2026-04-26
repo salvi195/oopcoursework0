@@ -125,7 +125,7 @@ class GameEngine:
         )
         return self.state
 
-    def start_round(self) -> None:
+    def start_round(self, starting_seat_index: int | None = None) -> None:
         state = self._require_state()
         state.round_number += 1
         state.phase = GamePhase.PLAYER_TURN
@@ -133,9 +133,22 @@ class GameEngine:
         state.current_claimant_index = None
         state.claim_stack.clear()
         state.double_down_claimant_index = None
+        state.deck = Deck.standard(self.rng)
 
         for player in state.players:
             player.shield_charges = 0
+            if player.eliminated:
+                player.receive_hand([])
+            else:
+                player.receive_hand(state.deck.draw(STARTING_HAND_SIZE))
+        if (
+            starting_seat_index is not None
+            and 0 <= starting_seat_index < len(state.players)
+            and not state.players[starting_seat_index].eliminated
+        ):
+            state.current_turn_index = starting_seat_index
+        elif state.players[state.current_turn_index].eliminated:
+            state.current_turn_index = self._next_active_seat(state.current_turn_index)
         for strategy in self.ai_strategies.values():
             strategy.on_round_started()
 
@@ -163,12 +176,32 @@ class GameEngine:
         return [rank for rank in ClaimRank if rank > state.current_claim.rank]
 
     def player_can_make_claim(self, player: PlayerState) -> bool:
-        return player.claimable_hand_size > 0 or bool(player.special_cards())
+        return player.claimable_hand_size > 0 or self._player_has_wildcard_claim(player)
+
+    def player_needs_special_redraw(self, player: PlayerState) -> bool:
+        return (
+            player.hand_size > 0
+            and player.claimable_hand_size == 0
+            and not self._player_has_wildcard_claim(player)
+        )
+
+    def refresh_special_only_hand(self, player: PlayerState) -> int:
+        if player.claimable_hand_size > 0:
+            return 0
+        if player.hand_size == 0:
+            return 0
+        player.receive_hand([])
+        return self._draw_until_claimable(player)
 
     def choose_ai_action(self, player: PlayerState) -> TurnAction:
         strategy = self.ai_strategies.get(player.seat_index)
         if strategy is None:
             raise ValueError(f"No AI strategy for {player.name}.")
+        state = self._require_state()
+        if state.current_claim is None and player.hand_size == 0 and not player.eliminated:
+            self.start_round(player.seat_index)
+        if state.current_claim is None and self.player_needs_special_redraw(player):
+            self.refresh_special_only_hand(player)
         return strategy.choose_action(self._build_ai_context(player))
 
     def process_action(self, player: PlayerState, action: TurnAction) -> ActionResult:
@@ -180,66 +213,24 @@ class GameEngine:
         state = self._require_state()
         summary_parts: list[str] = []
         narration_key: str | None = None
-
-        claim_cards: list[Card]
         special = self._peek_special(player, action.special_card_index)
+        self._validate_claim_can_commit_cards(player, action, special)
 
         if special == SpecialCardType.BLINDFOLD:
-            self._consume_special(player, action.special_card_index)
-            blindfold_count = action.blindfold_card_count or 1
-            claimable_indices = player.claimable_card_indices
-            chosen_indices = self.rng.sample(
-                claimable_indices,
-                k=min(blindfold_count, len(claimable_indices)),
-            )
-            claim_cards = player.remove_cards_by_indices(chosen_indices)
-            summary_parts.append(
-                f"{player.name} uses Blindfold and commits "
-                f"{len(claim_cards)} hidden cards."
-            )
+            claim_cards = self._claim_with_blindfold(player, action, summary_parts)
             narration_key = "blindfold_claim"
         elif special == SpecialCardType.MEMORY_WIPE:
-            adjusted_indices = self._consume_special(
-                player,
-                action.special_card_index,
-                list(action.card_indices),
-            )
-            state.public_memory_log.clear()
-            claim_cards = player.remove_cards_by_indices(adjusted_indices)
-            summary_parts.append(
-                f"{player.name} wipes the table memory clean before claiming."
-            )
+            claim_cards = self._claim_with_memory_wipe(player, action, summary_parts)
             narration_key = "memory_wipe"
         elif special == SpecialCardType.WILDCARD_HAND:
-            self._consume_special(player, action.special_card_index)
-            player.receive_hand([])
-            player.draw_from_deck(state.deck, 5)
-            chosen_indices = player.claimable_card_indices[:3]
-            claim_cards = player.remove_cards_by_indices(chosen_indices)
-            summary_parts.append(
-                f"{player.name} draws five new cards with Wildcard Hand."
-            )
+            claim_cards = self._claim_with_wildcard_hand(player, action, summary_parts)
             narration_key = "wildcard_hand"
         else:
-            adjusted_indices = list(action.card_indices)
-            if special == SpecialCardType.DOUBLE_DOWN:
-                adjusted_indices = self._consume_special(
-                    player,
-                    action.special_card_index,
-                    adjusted_indices,
-                )
-                state.double_down_claimant_index = player.seat_index
-                summary_parts.append(f"{player.name} commits with Double Down.")
-            elif special == SpecialCardType.SHIELD:
-                adjusted_indices = self._consume_special(
-                    player,
-                    action.special_card_index,
-                    adjusted_indices,
-                )
-                player.grant_shield()
-                summary_parts.append(f"{player.name} raises a Shield.")
+            claim_cards = self._claim_with_optional_buff(
+                player, action, special, summary_parts,
+            )
+            if special == SpecialCardType.SHIELD:
                 narration_key = "shield_turn"
-            claim_cards = player.remove_cards_by_indices(adjusted_indices)
 
         state.claim_stack = claim_cards
         state.current_claim = Claim(
@@ -286,6 +277,24 @@ class GameEngine:
         )
         self._notify_ai(state.turn_history[-1])
         return ActionResult(summary=" ".join(summary_parts))
+
+    def _validate_claim_can_commit_cards(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+        special: SpecialCardType | None,
+    ) -> None:
+        if special == SpecialCardType.WILDCARD_HAND:
+            if self._deck_has_regular_card():
+                return
+            raise ValueError("Wildcard Hand needs a regular card in the deck.")
+        if special == SpecialCardType.BLINDFOLD:
+            if player.claimable_hand_size > 0:
+                return
+            raise ValueError("Blindfold needs at least one regular card.")
+        if self._selected_regular_claim_indices(player, action):
+            return
+        raise ValueError("A claim needs at least one regular card.")
 
     def _process_challenge(
         self,
@@ -371,15 +380,20 @@ class GameEngine:
             summary_parts.append(f"{claimant.name}'s claim holds.")
             self._append_narration("challenge_fails")
 
-        state.current_claim = None
-        state.current_claimant_index = None
-        state.claim_stack.clear()
-        state.double_down_claimant_index = None
-        state.current_turn_index = self._next_active_seat(player.seat_index)
-
         match_winner = self._winner_name()
         if match_winner is not None:
+            state.current_claim = None
+            state.current_claimant_index = None
+            state.claim_stack.clear()
+            state.double_down_claimant_index = None
             state.phase = GamePhase.MATCH_OVER
+        else:
+            starting_seat = (
+                bullet_target.seat_index
+                if not bullet_target.eliminated
+                else self._next_active_seat(bullet_target.seat_index)
+            )
+            self.start_round(starting_seat)
 
         self._notify_ai(state.turn_history[-1])
         return ActionResult(
@@ -387,6 +401,86 @@ class GameEngine:
             match_ended=match_winner is not None,
             winner_name=match_winner,
         )
+
+    def _claim_with_blindfold(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+        summary_parts: list[str],
+    ) -> list[Card]:
+        self._consume_special(player, action.special_card_index)
+        claimable_indices = player.claimable_card_indices
+        max_count = min(4, len(claimable_indices))
+        blindfold_count = self.rng.randint(1, max_count)
+        chosen_indices = self.rng.sample(
+            claimable_indices,
+            k=min(blindfold_count, len(claimable_indices)),
+        )
+        claim_cards = player.remove_cards_by_indices(chosen_indices)
+        summary_parts.append(
+            f"{player.name} uses Blindfold and commits "
+            f"{len(claim_cards)} hidden cards."
+        )
+        return claim_cards
+
+    def _claim_with_memory_wipe(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+        summary_parts: list[str],
+    ) -> list[Card]:
+        state = self._require_state()
+        adjusted_indices = self._consume_special(
+            player,
+            action.special_card_index,
+            list(action.card_indices),
+        )
+        state.public_memory_log.clear()
+        claim_cards = player.remove_cards_by_indices(adjusted_indices)
+        summary_parts.append(
+            f"{player.name} wipes the table memory clean before claiming."
+        )
+        return claim_cards
+
+    def _claim_with_wildcard_hand(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+        summary_parts: list[str],
+    ) -> list[Card]:
+        state = self._require_state()
+        self._consume_special(player, action.special_card_index)
+        player.receive_hand([])
+        self._draw_until_claimable(player)
+        chosen_indices = player.claimable_card_indices[:3]
+        claim_cards = player.remove_cards_by_indices(chosen_indices)
+        summary_parts.append(
+            f"{player.name} draws new cards with Wildcard Hand."
+        )
+        return claim_cards
+
+    def _claim_with_optional_buff(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+        special: SpecialCardType | None,
+        summary_parts: list[str],
+    ) -> list[Card]:
+        state = self._require_state()
+        adjusted_indices = list(action.card_indices)
+        if special == SpecialCardType.DOUBLE_DOWN:
+            adjusted_indices = self._consume_special(
+                player, action.special_card_index, adjusted_indices,
+            )
+            state.double_down_claimant_index = player.seat_index
+            summary_parts.append(f"{player.name} commits with Double Down.")
+        elif special == SpecialCardType.SHIELD:
+            adjusted_indices = self._consume_special(
+                player, action.special_card_index, adjusted_indices,
+            )
+            player.grant_shield()
+            summary_parts.append(f"{player.name} raises a Shield.")
+        return player.remove_cards_by_indices(adjusted_indices)
 
     def _peek_special(
         self,
@@ -415,6 +509,43 @@ class GameEngine:
             for index in indexed_cards
             if index != special_card_index
         ]
+
+    def _selected_regular_claim_indices(
+        self,
+        player: PlayerState,
+        action: TurnAction,
+    ) -> list[int]:
+        return [
+            index
+            for index in action.card_indices
+            if 0 <= index < player.hand_size
+            and index != action.special_card_index
+            and not player.hand[index].is_special
+        ]
+
+    def _draw_until_claimable(self, player: PlayerState) -> int:
+        state = self._require_state()
+        drawn = 0
+        while len(player.hand) < STARTING_HAND_SIZE and state.deck.cards:
+            player.draw_from_deck(state.deck, 1)
+            drawn += 1
+        while player.claimable_hand_size == 0 and state.deck.cards:
+            player.draw_from_deck(state.deck, 1)
+            drawn += 1
+        return drawn
+
+    def _deck_has_regular_card(self) -> bool:
+        state = self._require_state()
+        return any(not card.is_special for card in state.deck.cards)
+
+    def _player_has_wildcard_claim(self, player: PlayerState) -> bool:
+        return (
+            self._deck_has_regular_card()
+            and any(
+                card.special == SpecialCardType.WILDCARD_HAND
+                for _, card in player.special_cards()
+            )
+        )
 
     def _append_narration(self, event_key: str) -> None:
         state = self._require_state()
@@ -486,6 +617,7 @@ class GameEngine:
             turn_history=tuple(state.turn_history),
             public_memory_log=tuple(state.public_memory_log),
             available_claim_ranks=tuple(self.legal_claim_ranks()),
+            deck_has_regular_card=self._deck_has_regular_card(),
         )
 
     def _next_active_seat(self, current_seat: int) -> int:

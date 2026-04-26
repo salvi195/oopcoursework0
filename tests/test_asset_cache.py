@@ -26,7 +26,7 @@ class AssetCacheTests(unittest.TestCase):
         shutil.rmtree(self.asset_dir, ignore_errors=True)
 
     def test_corrupt_clean_cache_is_regenerated(self) -> None:
-        source_path = self.asset_dir / "character_ash.png"
+        source_path = self.asset_dir / "character_wolf.png"
         source = pygame.Surface((8, 8), pygame.SRCALPHA)
         source.fill((24, 38, 52, 255))
         pygame.image.save(source, source_path)
@@ -34,7 +34,7 @@ class AssetCacheTests(unittest.TestCase):
         cache_path = (
             self.asset_dir
             / ".cleaned"
-            / f"character_ash_{FRINGE_CACHE_VERSION}.png"
+            / f"character_wolf_{FRINGE_CACHE_VERSION}.png"
         )
         cache_path.parent.mkdir()
         cache_path.write_bytes(b"not a png")

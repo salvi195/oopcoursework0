@@ -21,6 +21,7 @@ class AIContext:
     turn_history: tuple[TurnRecord, ...]
     public_memory_log: tuple[str, ...]
     available_claim_ranks: tuple[ClaimRank, ...]
+    deck_has_regular_card: bool
 
 
 class BaseAIStrategy:
@@ -35,17 +36,31 @@ class BaseAIStrategy:
         self.rng = rng or random.Random()
 
     def choose_action(self, context: AIContext) -> TurnAction:
+        if context.current_claim is not None and not context.available_claim_ranks:
+            return self._with_special(context, self._challenge_action())
+
+        if context.player.claimable_hand_size == 0:
+            wildcard_index = self._wildcard_index(context)
+            if wildcard_index is not None and context.deck_has_regular_card:
+                ranks = context.available_claim_ranks or tuple(ClaimRank)
+                return TurnAction.claim(
+                    card_indices=[],
+                    claim_rank=ranks[min(2, len(ranks) - 1)],
+                    presentation_style=self.style,
+                    special_card_index=wildcard_index,
+                    note="Uses Wildcard Hand to find claim cards.",
+                )
+            if context.current_claim is not None:
+                return self._with_special(context, self._challenge_action())
+
         if self._should_challenge(context):
-            return self._with_special(context, TurnAction.challenge(
-                presentation_style=self.style,
-                note=self.note,
-            ))
+            return self._with_special(context, self._challenge_action())
 
         ranks = context.available_claim_ranks or tuple(ClaimRank)
         truthful = self._truthful_options(context, ranks)
         bluff = not truthful or self.rng.random() < self.bluff_chance
         target_rank = self._target_rank(ranks, truthful, bluff)
-        card_count = min(self.max_claim_cards, max(1, context.player.hand_size))
+        card_count = min(self.max_claim_cards, max(1, context.player.claimable_hand_size))
 
         action = TurnAction.claim(
             card_indices=pick_cards_for_claim(
@@ -60,6 +75,12 @@ class BaseAIStrategy:
             note=self.note,
         )
         return self._with_special(context, action, bluff=bluff)
+
+    def _challenge_action(self) -> TurnAction:
+        return TurnAction.challenge(
+            presentation_style=self.style,
+            note=self.note,
+        )
 
     def on_round_started(self) -> None:
         return None
@@ -105,16 +126,26 @@ class BaseAIStrategy:
             if action.action_type == ActionType.CHALLENGE:
                 if special in (SpecialCardType.MIRROR_DAMAGE, SpecialCardType.SHIELD):
                     return action.with_special(hand_index)
-            elif special == SpecialCardType.BLINDFOLD and bluff:
-                return action.with_special(hand_index, blindfold_card_count=2)
-            elif special in (SpecialCardType.DOUBLE_DOWN, SpecialCardType.SHIELD):
+            elif special == SpecialCardType.WILDCARD_HAND and (
+                not action.card_indices or context.player.claimable_hand_size == 0
+            ):
                 return action.with_special(hand_index)
-            elif special == SpecialCardType.MEMORY_WIPE and context.public_memory_log:
+            elif special == SpecialCardType.BLINDFOLD and bluff and context.player.claimable_hand_size > 0:
+                return action.with_special(hand_index)
+            elif special in (SpecialCardType.DOUBLE_DOWN, SpecialCardType.SHIELD) and action.card_indices:
+                return action.with_special(hand_index)
+            elif special == SpecialCardType.MEMORY_WIPE and context.public_memory_log and action.card_indices:
                 return action.with_special(hand_index)
         return action
 
+    def _wildcard_index(self, context: AIContext) -> int | None:
+        for hand_index, card in context.player.special_cards():
+            if card.special == SpecialCardType.WILDCARD_HAND:
+                return hand_index
+        return None
 
-class DanteStrategy(BaseAIStrategy):
+
+class PigStrategy(BaseAIStrategy):
     bluff_chance = 0.70
     challenge_chance = 0.35
     max_claim_cards = 3
@@ -122,21 +153,21 @@ class DanteStrategy(BaseAIStrategy):
     note = "Pushes the table with bold claims."
 
 
-class AshStrategy(BaseAIStrategy):
+class WolfStrategy(BaseAIStrategy):
     bluff_chance = 0.40
     challenge_chance = 0.25
     style = PresentationStyle.MIRRORED
     note = "Keeps close to the table's pace."
 
 
-class MrFoldStrategy(BaseAIStrategy):
+class BullStrategy(BaseAIStrategy):
     bluff_chance = 0.15
     challenge_chance = 0.45
     style = PresentationStyle.COMPOSED
     note = "Prefers safer claims and careful challenges."
 
 
-class VesperStrategy(BaseAIStrategy):
+class BunnyStrategy(BaseAIStrategy):
     bluff_chance = 0.20
     challenge_chance = 0.18
     style = PresentationStyle.FLAT
@@ -155,6 +186,8 @@ class VesperStrategy(BaseAIStrategy):
                     ghost_mode=True,
                     note="Ghost Mode calls the claim.",
                 )
+            if context.player.claimable_hand_size == 0:
+                return super().choose_action(context)
             return TurnAction.claim(
                 card_indices=pick_cards_for_claim(
                     context.player.hand,
@@ -175,21 +208,12 @@ class VesperStrategy(BaseAIStrategy):
             self.pressure = min(3, self.pressure + 1)
 
 
-class FoxStrategy(BaseAIStrategy):
-    bluff_chance = 0.55
-    challenge_chance = 0.30
-    max_claim_cards = 3
-    style = PresentationStyle.THEATRICAL
-    note = "Uses reputation and style to sell the move."
-
-
 class StrategyFactory:
     _strategies = {
-        "dante": DanteStrategy,
-        "ash": AshStrategy,
-        "mr_fold": MrFoldStrategy,
-        "vesper": VesperStrategy,
-        "fox": FoxStrategy,
+        "pig": PigStrategy,
+        "wolf": WolfStrategy,
+        "bull": BullStrategy,
+        "bunny": BunnyStrategy,
     }
 
     @classmethod

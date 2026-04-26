@@ -8,11 +8,6 @@ import pygame
 FRINGE_CACHE_VERSION = "fringe_v8"
 
 
-def build_label(text: str, fallback: str = "Unknown") -> str:
-    cleaned = text.strip()
-    return cleaned or fallback
-
-
 class AssetLibrary:
     def __init__(
         self,
@@ -107,7 +102,7 @@ class AssetLibrary:
                 name,
                 size,
                 remove_checkerboard=True,
-                remove_white_fringe=key != "fox",
+                remove_white_fringe=key != "bunny",
             )
             if image is not None:
                 return image
@@ -183,7 +178,7 @@ class AssetLibrary:
                 name,
                 size,
                 remove_checkerboard=True,
-                remove_white_fringe=profile_key != "fox",
+                remove_white_fringe=profile_key != "bunny",
             )
             if image is not None:
                 return image
@@ -393,10 +388,10 @@ class AssetLibrary:
             self._remove_near_white_pixels(surface)
         elif asset_name == "table":
             self._remove_near_white_pixels(surface)
-        elif asset_name == "character_ash":
+        elif asset_name == "character_wolf":
             self._remove_near_transparent_light_pixels(surface, radius=9, alpha_cutoff=250)
             self._peel_light_edge(surface, passes=2)
-        elif asset_name == "character_mr_fold":
+        elif asset_name == "character_bull":
             self._remove_near_white_pixels(surface, min_y_ratio=0.45)
 
     def _remove_near_white_pixels(

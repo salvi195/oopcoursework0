@@ -9,6 +9,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 import pygame
 
 from src.engine import GameState
+from src.models.card import Card, Claim, ClaimRank, Rank, SpecialCardType, Suit
 from src.ui.game_app import BluffingGameApp, UIButton
 
 
@@ -96,6 +97,66 @@ class MenuInputTests(unittest.TestCase):
 
         self.assertEqual(app.mode, "table")
         self.assertIsNotNone(app.state)
+
+    def test_blindfold_controls_hidden_without_regular_cards(self) -> None:
+        app = self.build_app()
+        app._start_new_match()
+        self.assertIsNotNone(app.state)
+        player = app.state.players[0]
+        player.hand = [Card(special=SpecialCardType.BLINDFOLD)]
+        app.selected_special_index = 0
+        app.selected_cards.clear()
+
+        app._build_table_buttons(pygame.Rect(1000, 206, 244, 286), 224)
+
+        button_keys = {button.key for button in app.buttons}
+        self.assertNotIn("blindfold_minus", button_keys)
+        self.assertNotIn("blindfold_plus", button_keys)
+        confirm = next(button for button in app.buttons if button.key == "confirm_claim")
+        self.assertFalse(confirm.enabled)
+
+    def test_blindfold_controls_hidden_with_regular_cards(self) -> None:
+        app = self.build_app()
+        app._start_new_match()
+        self.assertIsNotNone(app.state)
+        player = app.state.players[0]
+        player.hand = [
+            Card(special=SpecialCardType.BLINDFOLD),
+            Card(rank=Rank.ACE, suit=Suit.SPADES),
+            Card(rank=Rank.KING, suit=Suit.HEARTS),
+        ]
+        app.selected_special_index = 0
+
+        app._build_table_buttons(pygame.Rect(1000, 206, 244, 286), 224)
+        button_keys = {button.key for button in app.buttons}
+        confirm = next(button for button in app.buttons if button.key == "confirm_claim")
+
+        self.assertNotIn("blindfold_minus", button_keys)
+        self.assertNotIn("blindfold_plus", button_keys)
+        self.assertTrue(confirm.enabled)
+
+    def test_empty_hand_only_offers_challenge_when_claim_active(self) -> None:
+        app = self.build_app()
+        app._start_new_match()
+        self.assertIsNotNone(app.state)
+        player = app.state.players[0]
+        opponent = app.state.players[1]
+        player.hand = []
+        app.state.current_claim = Claim(
+            rank=ClaimRank.PAIR,
+            declared_by=opponent.name,
+            card_count=1,
+        )
+        app.state.current_claimant_index = opponent.seat_index
+        app.state.current_turn_index = player.seat_index
+        app.buttons = []
+
+        app._build_table_buttons(pygame.Rect(1000, 206, 244, 286), 224)
+
+        button_keys = {button.key for button in app.buttons}
+        self.assertEqual(button_keys, {"challenge"})
+        self.assertTrue(app.buttons[0].enabled)
+        self.assertTrue(any("Call Liar" in line for line in app._action_lines()))
 
 
 if __name__ == "__main__":

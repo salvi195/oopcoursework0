@@ -62,11 +62,10 @@ def build_theme(asset_dir: Path) -> GameTheme:
             "special_card": special_card_font,
         },
         profile_colors={
-            "dante": (172, 67, 58),
-            "ash": (120, 137, 150),
-            "mr_fold": (91, 136, 109),
-            "vesper": (112, 96, 148),
-            "fox": (190, 122, 63),
+            "pig": (172, 67, 58),
+            "wolf": (120, 137, 150),
+            "bull": (91, 136, 109),
+            "bunny": (190, 122, 63),
             "dealer": ACCENT_GOLD,
         },
     )

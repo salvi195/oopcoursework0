@@ -4,10 +4,10 @@ import random
 from pathlib import Path
 import unittest
 
-from constants import DEALER_EVENT_LINES
-from src.actors.strategy import StrategyFactory, VesperStrategy
+from constants import DEALER_EVENT_LINES, STARTING_HAND_SIZE
+from src.actors.strategy import BunnyStrategy, StrategyFactory
 from src.engine import GameEngine, GamePhase, GameState, NarrationEvent
-from src.models.action import TurnAction
+from src.models.action import ActionType, TurnAction
 from src.models.card import Card, Claim, ClaimRank, Deck, Rank, SpecialCardType, Suit
 from src.models.evaluator import claim_is_truthful, evaluate_claim_rank
 from src.models.player import ChamberResult, PlayerState, ReputationBand, Revolver
@@ -64,13 +64,13 @@ class PlayerTests(unittest.TestCase):
 
 
 class StrategyAndPersistenceTests(unittest.TestCase):
-    def test_factory_builds_vesper_strategy(self) -> None:
+    def test_factory_builds_bunny_strategy(self) -> None:
         strategy = StrategyFactory.create(
-            "vesper",
-            owner_name="Vesper",
+            "bunny",
+            owner_name="The Bunny",
             rng=random.Random(1),
         )
-        self.assertIsInstance(strategy, VesperStrategy)
+        self.assertIsInstance(strategy, BunnyStrategy)
 
     def test_snapshot_store_writes_and_reads_json(self) -> None:
         path = Path("tests/.latest_match_test.json")
@@ -127,12 +127,12 @@ class StrategyAndPersistenceTests(unittest.TestCase):
                     "profile_key": None,
                 },
                 {
-                    "name": "Ash",
+                    "name": "The Wolf",
                     "seat_index": 1,
                     "reputation": 28,
                     "shield_charges": 0,
                     "eliminated": False,
-                    "profile_key": "ash",
+                    "profile_key": "wolf",
                 },
             ],
             "memory_log": ["Round 3 reveal"],
@@ -192,13 +192,13 @@ class EngineSpecialCardTests(unittest.TestCase):
                 card_indices=[],
                 claim_rank=ClaimRank.HIGH_CARD,
                 special_card_index=0,
-                blindfold_card_count=2,
             ),
         )
 
         self.assertIn("Blindfold", result.summary)
-        self.assertEqual(len(self.state.claim_stack), 2)
-        self.assertEqual(self.player.hand_size, 1)
+        self.assertGreaterEqual(len(self.state.claim_stack), 1)
+        self.assertLessEqual(len(self.state.claim_stack), 3)
+        self.assertEqual(self.player.hand_size, 3 - len(self.state.claim_stack))
 
     def test_memory_wipe_clears_public_memory_before_claim(self) -> None:
         self.state.public_memory_log.extend(["Round 1 reveal", "Round 2 reveal"])
@@ -244,8 +244,96 @@ class EngineSpecialCardTests(unittest.TestCase):
             ),
         )
 
-        self.assertIn("draws five new cards", result.summary)
+        self.assertIn("draws new cards", result.summary)
         self.assertEqual(self.player.hand_size, 2)
+
+    def test_ai_challenges_when_only_nonclaim_special_and_claim_active(self) -> None:
+        self.player.hand = [Card(rank=Rank.ACE, suit=Suit.SPADES)]
+        self.opponent.hand = [Card(special=SpecialCardType.MEMORY_WIPE)]
+
+        self.engine.process_action(
+            self.player,
+            TurnAction.claim(card_indices=[0], claim_rank=ClaimRank.HIGH_CARD),
+        )
+        action = self.engine.choose_ai_action(self.opponent)
+
+        self.assertEqual(action.action_type, ActionType.CHALLENGE)
+
+    def test_ai_challenges_when_empty_hand_and_claim_active(self) -> None:
+        self.player.hand = [Card(rank=Rank.ACE, suit=Suit.SPADES)]
+        self.opponent.hand = []
+
+        self.engine.process_action(
+            self.player,
+            TurnAction.claim(card_indices=[0], claim_rank=ClaimRank.HIGH_CARD),
+        )
+        action = self.engine.choose_ai_action(self.opponent)
+
+        self.assertEqual(action.action_type, ActionType.CHALLENGE)
+
+    def test_challenge_starts_new_dealt_round_with_loser_opening(self) -> None:
+        self.player.hand = [Card(rank=Rank.ACE, suit=Suit.SPADES)]
+        self.opponent.hand = [Card(rank=Rank.KING, suit=Suit.CLUBS)]
+        self.opponent.revolver = Revolver(
+            chambers=[ChamberResult.EMPTY] * 6,
+        )
+        round_number = self.state.round_number
+
+        self.engine.process_action(
+            self.player,
+            TurnAction.claim(card_indices=[0], claim_rank=ClaimRank.HIGH_CARD),
+        )
+        self.engine.process_action(self.opponent, TurnAction.challenge())
+
+        self.assertEqual(self.state.round_number, round_number + 1)
+        self.assertIsNone(self.state.current_claim)
+        self.assertEqual(self.state.current_turn_index, self.opponent.seat_index)
+        self.assertEqual(self.player.hand_size, STARTING_HAND_SIZE)
+        self.assertEqual(self.opponent.hand_size, STARTING_HAND_SIZE)
+        for extra_player in self.state.players[2:]:
+            self.assertEqual(extra_player.hand_size, 0)
+
+    def test_special_only_opener_refreshes_before_ai_claim(self) -> None:
+        self.opponent.hand = [Card(special=SpecialCardType.MEMORY_WIPE)]
+        self.state.current_turn_index = self.opponent.seat_index
+        self.state.deck = Deck(
+            cards=[
+                Card(special=SpecialCardType.SHIELD),
+                Card(rank=Rank.ACE, suit=Suit.SPADES),
+            ]
+        )
+
+        action = self.engine.choose_ai_action(self.opponent)
+
+        self.assertEqual(action.action_type, ActionType.CLAIM)
+        self.assertGreater(self.opponent.claimable_hand_size, 0)
+        self.assertTrue(action.card_indices)
+
+    def test_empty_opener_gets_new_deal_before_ai_claim(self) -> None:
+        self.opponent.hand = []
+        self.state.current_turn_index = self.opponent.seat_index
+        round_number = self.state.round_number
+
+        action = self.engine.choose_ai_action(self.opponent)
+
+        self.assertEqual(self.state.round_number, round_number + 1)
+        self.assertEqual(self.opponent.hand_size, STARTING_HAND_SIZE)
+        self.assertEqual(action.action_type, ActionType.CLAIM)
+
+    def test_engine_rejects_zero_card_special_claim(self) -> None:
+        self.player.hand = [Card(special=SpecialCardType.SHIELD)]
+
+        with self.assertRaises(ValueError):
+            self.engine.process_action(
+                self.player,
+                TurnAction.claim(
+                    card_indices=[],
+                    claim_rank=ClaimRank.HIGH_CARD,
+                    special_card_index=0,
+                ),
+            )
+
+        self.assertEqual(self.player.hand_size, 1)
 
     def test_double_down_causes_two_bullet_spins_on_truthful_claim(self) -> None:
         self.player.hand = [

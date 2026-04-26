@@ -11,28 +11,13 @@ class AIProfile:
 
 
 OPPONENT_PROFILES: tuple[AIProfile, ...] = (
-    AIProfile(
-        key="dante",
-        display_name="The Pig",
-    ),
-    AIProfile(
-        key="ash",
-        display_name="The Wolf",
-    ),
-    AIProfile(
-        key="mr_fold",
-        display_name="The Bull",
-    ),
-    AIProfile(
-        key="fox",
-        display_name="The Bunny",
-    ),
+    AIProfile(key="pig", display_name="The Pig"),
+    AIProfile(key="wolf", display_name="The Wolf"),
+    AIProfile(key="bull", display_name="The Bull"),
+    AIProfile(key="bunny", display_name="The Bunny"),
 )
 
-DEALER_PROFILE = AIProfile(
-    key="dealer",
-    display_name="The Dealer",
-)
+DEALER_PROFILE = AIProfile(key="dealer", display_name="The Dealer")
 
 
 def get_opponent_profiles(

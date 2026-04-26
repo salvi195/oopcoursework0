@@ -14,39 +14,8 @@ TABLE_FELT = (27, 54, 46)
 ACCENT_GOLD = (207, 175, 102)
 TEXT_PRIMARY = (238, 231, 218)
 TEXT_MUTED = (163, 155, 142)
-DEALER_OPENING_LINES = (
-    "Cards first. Regrets after.",
-    "No one came here to be believed.",
-    "The room is quiet. That never lasts.",
-    "Keep your hands steady. The table is listening.",
-    "Every honest claim sounds rehearsed in here.",
-    "A bad room to tell the truth in.",
-)
-
-DEALER_VICTORY_LINES = (
-    "The table keeps its final witness.",
-    "The room chooses one name and forgets the others.",
-    "A winner is only the last person still willing to sit here.",
-    "The bar closes around one steady hand.",
-    "All that noise for one survivor.",
-)
 
 DEALER_EVENT_LINES = {
-    "opening_claim": (
-        "The first claim sets the room's temperature.",
-        "Someone had to open the night. That was the easy part.",
-        "A table always pretends to be calm before the first lie lands.",
-    ),
-    "opening_bluff": (
-        "Starting with a lie is bold. Staying alive after it is harder.",
-        "First blood nearly always begins with confidence.",
-        "Opening on a bluff means asking the room for mercy.",
-    ),
-    "big_jump": (
-        "Too high, too fast. Someone wants the room dizzy.",
-        "That jump was meant to stun, not persuade.",
-        "Big claims are usually aimed at the nerves, not the cards.",
-    ),
     "elimination": (
         "One chair goes quiet.",
         "The room makes space for the dead.",
@@ -56,21 +25,6 @@ DEALER_EVENT_LINES = {
         "Vesper finally focuses. The table notices too late.",
         "The Ghost decides the room has said enough.",
         "A still man becomes a threat all at once.",
-    ),
-    "dante_overbluff_death": (
-        "The Pig leaned too hard on a bad lie and paid for it.",
-        "The Pig finally believed his own story.",
-        "The Pig lost the only way he ever meant to play: overcommitted.",
-    ),
-    "fox_theatrical_challenge": (
-        "The Bunny made a performance out of doubt.",
-        "Even the challenge was staged for applause.",
-        "The Bunny called it like she was stepping into spotlight.",
-    ),
-    "mirror_damage": (
-        "The mirror does not forgive a bad read.",
-        "Risk changed hands without warning.",
-        "The table hates a trick that works this cleanly.",
     ),
     "blindfold_claim": (
         "Even the liar went in blind.",
@@ -96,16 +50,6 @@ DEALER_EVENT_LINES = {
         "The chamber spits smoke and mercy.",
         "A misfire is still a warning. The table heard it.",
         "The room exhales when the metal changes its mind.",
-    ),
-    "double_down": (
-        "The stakes were doubled and someone still reached.",
-        "Confidence always sounds expensive after Double Down.",
-        "The room let one honest hand become a punishment.",
-    ),
-    "ash_mirror": (
-        "Ash does not invent. He reflects.",
-        "The Mimic offers the table its own habits back.",
-        "Someone taught Ash that move by making it first.",
     ),
     "trusted_claim": (
         "A trusted voice buys itself dangerous room.",

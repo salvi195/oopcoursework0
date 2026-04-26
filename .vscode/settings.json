@@ -1,0 +1,16 @@
+{
+    "python.defaultInterpreterPath": "C:\\msys64\\ucrt64\\bin\\python.exe",
+    "python.testing.unittestEnabled": true,
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "tests",
+        "-p",
+        "test*.py"
+    ],
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true
+    }
+}
