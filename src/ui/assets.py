@@ -35,6 +35,43 @@ class AssetLibrary:
     ) -> pygame.Surface | None:
         return self._load_image(name, size)
 
+    def cover_image(
+        self,
+        name: str,
+        size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        cache_key = (f"cover:{name}", size, False, False)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        for suffix in (".png", ".jpg", ".jpeg"):
+            path = self.asset_dir / f"{name}{suffix}"
+            if not path.exists():
+                continue
+            source = self._load_surface(path)
+            if source is None:
+                continue
+            source_width, source_height = source.get_size()
+            target_width, target_height = size
+            scale = max(target_width / source_width, target_height / source_height)
+            scaled_size = (
+                max(1, int(source_width * scale)),
+                max(1, int(source_height * scale)),
+            )
+            scaled = pygame.transform.smoothscale(source, scaled_size)
+            crop = pygame.Rect(
+                (scaled_size[0] - target_width) // 2,
+                (scaled_size[1] - target_height) // 2,
+                target_width,
+                target_height,
+            )
+            result = scaled.subsurface(crop).copy()
+            self._cache[cache_key] = result
+            return result
+
+        self._cache[cache_key] = None
+        return None
+
     def transparent_image(
         self,
         name: str,

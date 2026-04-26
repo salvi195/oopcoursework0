@@ -51,6 +51,12 @@ class MenuInputTests(unittest.TestCase):
             pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
         )
 
+        self.assertEqual(app.mode, "menu")
+        self.assertEqual(app.menu_loading_action, "new")
+        app._update_menu_loading(
+            app.menu_loading_started_at + app.menu_loading_duration_ms
+        )
+
         self.assertEqual(app.mode, "table")
         self.assertIsNotNone(app.state)
         self.assertIn("Round 1 begins", app.last_result)
@@ -65,6 +71,11 @@ class MenuInputTests(unittest.TestCase):
             pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(100, 360))
         )
 
+        self.assertEqual(app.menu_loading_action, "new")
+        app._update_menu_loading(
+            app.menu_loading_started_at + app.menu_loading_duration_ms
+        )
+
         self.assertEqual(app.mode, "table")
         self.assertIsNotNone(app.state)
 
@@ -76,6 +87,11 @@ class MenuInputTests(unittest.TestCase):
 
         app._handle_menu_event(
             pygame.event.Event(pygame.FINGERDOWN, x=100 / 1280, y=360 / 800)
+        )
+
+        self.assertEqual(app.menu_loading_action, "new")
+        app._update_menu_loading(
+            app.menu_loading_started_at + app.menu_loading_duration_ms
         )
 
         self.assertEqual(app.mode, "table")

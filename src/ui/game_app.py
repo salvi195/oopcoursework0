@@ -79,6 +79,9 @@ class BluffingGameApp:
         self.blindfold_count = 2
         self.status_message = ""
         self.last_result = ""
+        self.menu_loading_action: str | None = None
+        self.menu_loading_started_at = 0
+        self.menu_loading_duration_ms = 850
         self.ai_due_at = 0
         self.turn_marker: tuple[int, int, int] | None = None
         self.presentation_queue: list[PresentationEvent] = []
@@ -112,6 +115,8 @@ class BluffingGameApp:
                     self._handle_table_event(event)
             if self.mode == "table":
                 self._update_table(now)
+            elif self.mode == "menu":
+                self._update_menu_loading(now)
             self._draw(now)
             pygame.display.flip()
             self.clock.tick(TARGET_FPS)
@@ -233,10 +238,15 @@ class BluffingGameApp:
 
     def _handle_menu_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYDOWN:
+            if self.menu_loading_action is not None:
+                return
             if event.key in {pygame.K_RETURN, pygame.K_SPACE}:
-                self._start_new_match()
+                self._begin_menu_loading("new")
             elif event.key == pygame.K_ESCAPE:
                 self.running = False
+            return
+
+        if self.menu_loading_action is not None:
             return
 
         if event.type == pygame.FINGERDOWN:
@@ -253,11 +263,29 @@ class BluffingGameApp:
 
     def _activate_menu_button(self, button: UIButton) -> None:
         if button.key == "menu_new":
-            self._start_new_match()
+            self._begin_menu_loading("new")
         elif button.key == "menu_resume":
-            self._resume_match()
+            self._begin_menu_loading("resume")
         elif button.key == "menu_quit":
             self.running = False
+
+    def _begin_menu_loading(self, action: str) -> None:
+        if action == "resume" and self.saved_summary is None:
+            return
+        self.menu_loading_action = action
+        self.menu_loading_started_at = pygame.time.get_ticks()
+
+    def _update_menu_loading(self, now: int) -> None:
+        if self.menu_loading_action is None:
+            return
+        if now - self.menu_loading_started_at < self.menu_loading_duration_ms:
+            return
+        action = self.menu_loading_action
+        self.menu_loading_action = None
+        if action == "new":
+            self._start_new_match()
+        elif action == "resume":
+            self._resume_match()
 
     def _handle_table_event(self, event: pygame.event.Event) -> None:
         if self.state is None:
@@ -607,17 +635,17 @@ class BluffingGameApp:
             and not self.state.players[0].eliminated
             and record.actor_name != self.state.players[0].name
         )
-        detail = f"{record.card_count or 0} card(s)."
+        detail = f"{record.card_count or 0}x {rank_label.upper()}"
         if record.special_used:
-            detail = f"{record.special_used.replace('_', ' ').title()}. {detail}"
+            detail = f"{detail} / {record.special_used.replace('_', ' ').title()}"
         self._queue_presentation(
             PresentationEvent(
                 kind="claim",
-                title="Claim Made",
-                subtitle=f"{record.actor_name} claims {rank_label}",
+                title=record.actor_name,
+                subtitle="CLAIMS",
                 detail=detail,
                 actor_name=record.actor_name,
-                duration_ms=5200 if allow_input else 3300,
+                duration_ms=6000 if allow_input else 2500,
                 allow_input=allow_input,
                 emphasis="gold",
             )
@@ -639,7 +667,7 @@ class BluffingGameApp:
                 detail=f"{record.actor_name} calls liar.",
                 actor_name=record.actor_name,
                 target_name=target,
-                duration_ms=2400,
+                duration_ms=2600,
                 emphasis="danger",
             )
         )
@@ -657,7 +685,7 @@ class BluffingGameApp:
                 detail=verdict_detail,
                 actor_name=record.actor_name,
                 target_name=record.bullet_target_name,
-                duration_ms=2600,
+                duration_ms=3200,
                 emphasis="danger" if record.challenge_successful else "gold",
             )
         )
@@ -685,7 +713,7 @@ class BluffingGameApp:
                     subtitle=spin_label or (record.bullet_target_name or "Revolver spin"),
                     detail=detail,
                     target_name=record.bullet_target_name,
-                    duration_ms=4300 if eliminated else 3600,
+                    duration_ms=6500 if eliminated else 5600,
                     emphasis="danger" if eliminated or result == "loaded" else "gold",
                     chance_percent=chance,
                     chamber_index=chamber,
@@ -782,7 +810,7 @@ class BluffingGameApp:
         self.hand_targets = []
         self._draw_background(now)
         if self.mode == "menu":
-            self._draw_menu(mouse_pos)
+            self._draw_menu(mouse_pos, now)
         else:
             self._draw_table(mouse_pos, now)
 
@@ -814,21 +842,18 @@ class BluffingGameApp:
         self.screen.fill(self.colors["bg"])
         if self.mode == "menu":
             background = (
-                self.assets.image("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
-                or self.assets.image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.assets.cover_image("menu_showdown", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.cover_image("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.cover_image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
                 or self.assets.background("menu_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
             )
             if background is not None:
                 self.screen.blit(background, (0, 0))
-            glow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            pulse = 16 + int(8 * (1 + pygame.math.Vector2(1, 0).rotate(now * 0.03).x))
-            pygame.draw.circle(glow, (244, 171, 83, 40), (640, 180), 250 + pulse)
-            pygame.draw.rect(glow, (0, 0, 0, 68), pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
-            self.screen.blit(glow, (0, 0))
+            return
         else:
             background = (
-                self.assets.image("table_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
-                or self.assets.image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.assets.cover_image("table_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
+                or self.assets.cover_image("bar_room", (SCREEN_WIDTH, SCREEN_HEIGHT))
             )
             if background is not None:
                 self.screen.blit(background, (0, 0))
@@ -925,43 +950,36 @@ class BluffingGameApp:
         pygame.draw.ellipse(shadow, (0, 0, 0, 56), pygame.Rect(264, 168, 740, 180))
         self.screen.blit(shadow, (0, 0))
 
-    def _draw_menu(self, mouse_pos: tuple[int, int]) -> None:
-        shade = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        shade.fill((10, 8, 7, 88))
-        pygame.draw.rect(shade, (0, 0, 0, 130), pygame.Rect(0, 0, 438, SCREEN_HEIGHT))
-        self.screen.blit(shade, (0, 0))
-
-        self._draw_neon_title(("LIAR'S", "BAR"), (88, 96))
+    def _draw_menu(self, mouse_pos: tuple[int, int], now: int) -> None:
+        title_font = pygame.font.SysFont("agency fb", 92, bold=False)
+        title_x = 86
+        title_y = 286
+        for line in ("SHOW", "DOWN"):
+            self._blit_led_text(title_font, line, (title_x, title_y))
+            title_y += 92
 
         button_specs = [
             ("menu_new", "ENTER THE BAR", True),
             ("menu_resume", "RESUME", self.saved_summary is not None),
             ("menu_quit", "EXIT", True),
         ]
-        top = 348
+        top = 540
         for key, label, enabled in button_specs:
-            rect = pygame.Rect(82, top, 318, 54)
+            rect = pygame.Rect(86, top, 318, 54)
             button = UIButton(key=key, label=label, rect=rect, enabled=enabled)
             self.buttons.append(button)
-            self._draw_menu_option(button, mouse_pos, primary=key == "menu_new")
+            loading_this_button = (
+                (self.menu_loading_action == "new" and key == "menu_new")
+                or (self.menu_loading_action == "resume" and key == "menu_resume")
+            )
+            self._draw_menu_option(
+                button,
+                mouse_pos,
+                primary=key == "menu_new" or loading_this_button,
+                loading=loading_this_button,
+                now=now,
+            )
             top += 66
-
-        if self.saved_summary is not None:
-            alive_players = self._saved_alive_players()
-            summary_lines = [
-                f"Saved round {self.saved_summary.get('round_number', '?')} is ready.",
-                f"Still seated: {len(alive_players) if alive_players else '?'}",
-            ]
-        else:
-            summary_lines = [
-                "No saved match yet.",
-            ]
-        self._draw_wrapped_text(
-            summary_lines,
-            pygame.Rect(84, 560, 310, 70),
-            self.fonts["menu_small"],
-            self.colors["muted"],
-        )
 
     def _saved_alive_players(self) -> list[str]:
         if self.saved_summary is None:
@@ -1009,6 +1027,7 @@ class BluffingGameApp:
         self._draw_human_hand(layout["hand_rect"], mouse_pos)
         self._draw_claim_hud(layout["claim_hud"])
         self._draw_action_hud(layout["move_hud"])
+        self._draw_human_revolver_status()
         self._build_table_buttons(layout["control_rect"], layout["claim_buttons_top"])
         for button in self.buttons:
             self._draw_button(button, mouse_pos)
@@ -1062,12 +1081,36 @@ class BluffingGameApp:
         self.screen.blit(hot_core, (pos[0] + 1, pos[1] - 1))
         return rect
 
+    def _blit_led_text(
+        self,
+        font: pygame.font.Font,
+        text: str,
+        pos: tuple[int, int],
+    ) -> pygame.Rect:
+        glow_color = (255, 38, 28)
+        for radius, alpha in ((8, 30), (4, 64), (2, 105)):
+            glow = font.render(text, True, glow_color)
+            glow.set_alpha(alpha)
+            self.screen.blit(glow, (pos[0] - radius, pos[1]))
+            self.screen.blit(glow, (pos[0] + radius, pos[1]))
+            self.screen.blit(glow, (pos[0], pos[1] - radius))
+            self.screen.blit(glow, (pos[0], pos[1] + radius))
+        base = font.render(text, True, (255, 64, 48))
+        rect = base.get_rect(topleft=pos)
+        self.screen.blit(base, rect)
+        core = font.render(text, True, (255, 220, 180))
+        core.set_alpha(96)
+        self.screen.blit(core, pos)
+        return rect
+
     def _draw_menu_option(
         self,
         button: UIButton,
         mouse_pos: tuple[int, int],
         *,
         primary: bool = False,
+        loading: bool = False,
+        now: int = 0,
     ) -> None:
         hovered = button.enabled and button.rect.collidepoint(mouse_pos)
         highlighted = button.enabled and (primary or hovered)
@@ -1079,28 +1122,29 @@ class BluffingGameApp:
         else:
             color = (103, 99, 96)
 
-        shadow = font.render(button.label, True, (18, 11, 9))
-        shadow_rect = shadow.get_rect(midleft=(button.rect.x + 2, button.rect.centery + 2))
-        self.screen.blit(shadow, shadow_rect)
         label = font.render(button.label, True, color)
         label_rect = label.get_rect(midleft=(button.rect.x, button.rect.centery))
-        self.screen.blit(label, label_rect)
-
         if highlighted:
-            line_y = label_rect.bottom + 6
-            line_end = min(button.rect.right, label_rect.right + 56)
-            pygame.draw.line(self.screen, self.colors["gold"], (label_rect.x, line_y), (line_end, line_y), 2)
-            diamond_x = label_rect.x + (line_end - label_rect.x) // 2
-            pygame.draw.polygon(
-                self.screen,
-                self.colors["gold"],
-                [
-                    (diamond_x, line_y - 6),
-                    (diamond_x + 6, line_y),
-                    (diamond_x, line_y + 6),
-                    (diamond_x - 6, line_y),
-                ],
-            )
+            glow = font.render(button.label, True, (255, 60, 42))
+            glow.set_alpha(62 if loading else 34)
+            for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+                self.screen.blit(glow, label_rect.move(dx, dy))
+        self.screen.blit(label, label_rect)
+        if loading:
+            self._draw_menu_loading_dots(label_rect, now)
+
+    def _draw_menu_loading_dots(self, label_rect: pygame.Rect, now: int) -> None:
+        start_x = label_rect.right + 22
+        center_y = label_rect.centery + 3
+        for index in range(3):
+            phase = (now // 150 + index) % 3
+            radius = 4 + (1 if phase == 0 else 0)
+            alpha = 230 if phase == 0 else 130
+            color = (255, 208, 112, alpha)
+            dot = pygame.Surface((18, 18), pygame.SRCALPHA)
+            pygame.draw.circle(dot, color, (9, 9), radius)
+            pygame.draw.circle(dot, (255, 77, 46, max(50, alpha // 3)), (9, 9), radius + 4, 1)
+            self.screen.blit(dot, dot.get_rect(center=(start_x + index * 18, center_y)))
 
     def _draw_presentation_overlay(self, now: int) -> None:
         event = self.presentation_event
@@ -1108,7 +1152,6 @@ class BluffingGameApp:
             return
         remaining_ms = max(0, self.presentation_until - now)
         progress = 1 - remaining_ms / max(1, event.duration_ms)
-        alpha = 200 if event.kind in {"challenge", "bullet", "verdict"} else 178
 
         if event.kind == "bullet":
             self._draw_revolver_presentation(event, progress)
@@ -1116,228 +1159,341 @@ class BluffingGameApp:
         if event.kind == "reputation":
             self._draw_reputation_presentation(event, progress)
             return
+        self._draw_minimal_presentation(event, progress, remaining_ms)
 
-        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 54 if not event.allow_input else 26))
-        self.screen.blit(dim, (0, 0))
+    def _draw_minimal_presentation(
+        self,
+        event: PresentationEvent,
+        progress: float,
+        remaining_ms: int,
+    ) -> None:
+        color = (232, 78, 55) if event.emphasis == "danger" else (222, 176, 86)
+        center = self._presentation_text_center(event)
+        title = event.title.upper()
+        subtitle = event.subtitle.upper() if event.subtitle else ""
+        detail = event.detail.upper() if event.detail else ""
 
-        panel = pygame.Rect(300, 218, 680, 224)
-        if event.kind == "challenge":
-            panel = pygame.Rect(292, 218, 696, 218)
-        elif event.kind == "verdict":
-            panel = pygame.Rect(274, 216, 732, 228)
-        elif event.kind == "claim":
-            if event.allow_input:
-                panel = pygame.Rect(272, 150, 736, 242)
-            else:
-                panel = pygame.Rect(300, 220, 680, 206)
+        if event.kind == "claim":
+            title_font = self._font_for_width(
+                title,
+                (self.fonts["hud_title"], self.fonts["hud_body"], self.fonts["hud_small"]),
+                360,
+            )
+            self._blit_hud_text(title_font, title, center, anchor="center")
+            self._blit_hud_text(
+                self.fonts["hud_body"],
+                subtitle,
+                (center[0], center[1] + 34),
+                anchor="center",
+                color=(255, 236, 179),
+            )
+            self._blit_hud_text(
+                self.fonts["hud_body"],
+                detail,
+                (center[0], center[1] + 68),
+                anchor="center",
+                color=(255, 248, 220),
+            )
+            if event.allow_input and remaining_ms > 0:
+                self._draw_call_liar_prompt(
+                    (center[0], center[1] + 108),
+                    remaining_ms,
+                    progress,
+                )
+            return
+
+        self._blit_hud_text(
+            self.fonts["hud_title"],
+            title,
+            center,
+            anchor="center",
+            color=(255, 241, 199) if event.emphasis != "danger" else (255, 168, 132),
+        )
+        if subtitle:
+            self._blit_hud_text(
+                self.fonts["hud_body"],
+                subtitle,
+                (center[0], center[1] + 46),
+                anchor="center",
+                color=color,
+            )
+        if detail:
+            self._draw_centered_hud_lines(
+                detail,
+                pygame.Rect(center[0] - 330, center[1] + 78, 660, 58),
+                self.fonts["hud_small"],
+                (255, 235, 190),
+            )
+        self._draw_minimal_progress(
+            pygame.Rect(center[0] - 170, center[1] + 144, 340, 4),
+            color,
+            progress,
+        )
+
+    def _presentation_text_center(self, event: PresentationEvent) -> tuple[int, int]:
+        if event.kind == "reputation":
+            return (SCREEN_WIDTH // 2, 592)
+        return (SCREEN_WIDTH // 2, 350)
+
+    def _draw_call_liar_prompt(
+        self,
+        center: tuple[int, int],
+        remaining_ms: int,
+        progress: float,
+    ) -> None:
+        font = self.fonts["hud_body"]
+        label = font.render("CALL LIAR", True, (255, 241, 199))
+        key_rect = pygame.Rect(0, 0, 32, 26)
+        timer_text = str(math.ceil(remaining_ms / 1000))
+        timer = font.render(timer_text, True, (255, 241, 199))
+        gap = 10
+        total_width = label.get_width() + gap + key_rect.width + gap + timer.get_width()
+        left = center[0] - total_width // 2
+        label_rect = self._blit_hud_text(
+            font,
+            "CALL LIAR",
+            (left, center[1]),
+            anchor="midleft",
+            color=(255, 241, 199),
+        )
+        key_rect.midleft = (label_rect.right + gap, center[1])
+        pygame.draw.rect(self.screen, (68, 38, 18), key_rect, border_radius=4)
+        pygame.draw.rect(self.screen, (224, 172, 78), key_rect, 1, 4)
+        key = font.render("X", True, (255, 241, 199))
+        self.screen.blit(key, key.get_rect(center=key_rect.center))
+        self._blit_hud_text(
+            font,
+            timer_text,
+            (key_rect.right + gap, center[1]),
+            anchor="midleft",
+            color=(255, 241, 199),
+        )
+        self._draw_minimal_progress(
+            pygame.Rect(center[0] - 92, center[1] + 20, 184, 4),
+            (224, 172, 78),
+            progress,
+        )
+
+    def _draw_minimal_progress(
+        self,
+        rect: pygame.Rect,
+        color: tuple[int, int, int],
+        progress: float,
+    ) -> None:
+        pygame.draw.rect(self.screen, (68, 38, 18), rect, border_radius=2)
+        pygame.draw.rect(
+            self.screen,
+            color,
+            pygame.Rect(rect.x, rect.y, max(2, int(rect.width * progress)), rect.height),
+            border_radius=2,
+        )
+
+    def _presentation_panel_rect(self) -> pygame.Rect:
+        return pygame.Rect(204, 150, 872, 300)
+
+    def _draw_presentation_frame(
+        self,
+        panel: pygame.Rect,
+        border: tuple[int, int, int],
+        *,
+        split_x: int | None = None,
+    ) -> None:
         surface = pygame.Surface(panel.size, pygame.SRCALPHA)
         for y in range(panel.height):
             distance = abs((y / max(1, panel.height - 1)) - 0.5) * 2
-            line_alpha = int(alpha * (0.78 - distance * 0.28))
-            pygame.draw.line(surface, (8, 7, 6, max(70, line_alpha)), (0, y), (panel.width, y))
-        border = (216, 60, 44) if event.emphasis == "danger" else self.colors["gold"]
+            alpha = int(178 * (0.78 - distance * 0.28))
+            pygame.draw.line(surface, (8, 7, 6, max(76, alpha)), (0, y), (panel.width, y))
         self.screen.blit(surface, panel.topleft)
-        line_inset = 46
+
+        line_inset = 34
         pygame.draw.line(
             self.screen,
-            (*border, 172),
-            (panel.x + line_inset, panel.y + 12),
-            (panel.right - line_inset, panel.y + 12),
+            (*border, 184),
+            (panel.x + line_inset, panel.y + 14),
+            (panel.right - line_inset, panel.y + 14),
             1,
         )
         pygame.draw.line(
             self.screen,
-            (*border, 118),
-            (panel.x + line_inset, panel.bottom - 14),
-            (panel.right - line_inset, panel.bottom - 14),
-            1,
+            (*border, 138),
+            (panel.x + line_inset, panel.bottom - 18),
+            (panel.right - line_inset, panel.bottom - 18),
+            2,
         )
+        if split_x is not None:
+            pygame.draw.line(
+                self.screen,
+                (*border, 126),
+                (panel.x + split_x, panel.y + 34),
+                (panel.x + split_x, panel.bottom - 42),
+                1,
+            )
 
-        title_font = self.fonts["hud_title"]
-        subtitle_font = self.fonts["subtitle"]
-        detail_font = self.fonts["small"] if event.kind == "verdict" else self.fonts["body"]
-        title_y = panel.y + 34
-        subtitle_y = panel.y + 82
-        detail_y = panel.y + 126
-        detail_height = max(36, panel.bottom - panel.y - 158)
-        if event.kind == "claim" and event.allow_input:
-            title_y = panel.y + 28
-            subtitle_y = panel.y + 72
-            detail_y = panel.y + 114
-            detail_height = 34
-        self._blit_shadow_text(
-            title_font,
-            event.title.upper(),
-            self.colors["text"],
-            (panel.centerx, title_y),
-            anchor="center",
-        )
-        if event.subtitle:
-            subtitle_font = self._font_for_width(
-                event.subtitle,
-                (subtitle_font, self.fonts["body_bold"], self.fonts["small"]),
-                panel.width - 92,
-            )
-            self._blit_shadow_text(
-                subtitle_font,
-                event.subtitle,
-                self.colors["gold"] if event.emphasis != "danger" else (244, 115, 92),
-                (panel.centerx, subtitle_y),
-                anchor="center",
-            )
-        if event.detail:
-            detail_rect = pygame.Rect(
-                panel.x + 54,
-                detail_y,
-                panel.width - 108,
-                detail_height,
-            )
-            self._draw_centered_text_block(
-                event.detail,
-                detail_rect,
-                detail_font,
-                self.colors["cream"],
-            )
-        if event.kind == "bullet":
-            self._draw_bullet_chambers(panel, event)
-
-        bar_width = panel.width - 68
-        bar_y = panel.bottom - 20
-        if event.kind == "claim" and event.allow_input:
-            bar_y = panel.bottom - 18
-        bar_rect = pygame.Rect(panel.x + 34, bar_y, bar_width, 4)
-        pygame.draw.rect(self.screen, (70, 56, 42), bar_rect, border_radius=2)
+    def _draw_presentation_progress(
+        self,
+        panel: pygame.Rect,
+        border: tuple[int, int, int],
+        progress: float,
+    ) -> None:
+        bar_width = panel.width - 80
+        bar_rect = pygame.Rect(panel.x + 40, panel.bottom - 20, bar_width, 4)
+        pygame.draw.rect(self.screen, (60, 41, 28), bar_rect, border_radius=2)
         pygame.draw.rect(
             self.screen,
             border,
             pygame.Rect(bar_rect.x, bar_rect.y, int(bar_width * progress), bar_rect.height),
             border_radius=2,
         )
-        if event.allow_input and remaining_ms > 0:
-            call_rect = pygame.Rect(panel.centerx - 104, panel.bottom - 64, 208, 38)
-            call_button = UIButton("challenge", "CALL LIAR", call_rect, enabled=True)
-            self.buttons.append(call_button)
-            self._draw_presentation_button(call_button, danger=True)
-            timer = self.fonts["hud_small"].render(
-                str(math.ceil(remaining_ms / 1000)),
-                True,
-                self.colors["cream"],
-            )
-            timer_rect = pygame.Rect(call_rect.right + 10, call_rect.y + 3, 30, 30)
-            pygame.draw.circle(self.screen, (18, 13, 10), timer_rect.center, 15)
-            pygame.draw.circle(self.screen, border, timer_rect.center, 15, 1)
-            self.screen.blit(timer, timer.get_rect(center=timer_rect.center))
 
     def _draw_revolver_presentation(
         self,
         event: PresentationEvent,
         progress: float,
     ) -> None:
-        reveal = progress >= 0.86
-        lethal = event.emphasis == "danger"
-        border = (216, 60, 44) if reveal and lethal else self.colors["gold"]
-        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 72))
-        self.screen.blit(dim, (0, 0))
+        reveal_at = 0.62
+        reveal = progress >= reveal_at
+        detail_lower = event.detail.lower()
+        eliminated = "eliminated" in detail_lower
+        loaded = "loaded" in detail_lower or event.emphasis == "danger"
+        danger_result = reveal and (loaded or eliminated)
+        accent = (232, 78, 55) if danger_result else (222, 176, 86)
+        if reveal and eliminated:
+            dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            dim.fill((0, 0, 0, 34))
+            self.screen.blit(dim, (0, 0))
 
-        panel = pygame.Rect(204, 162, 872, 390)
-        surface = pygame.Surface(panel.size, pygame.SRCALPHA)
-        pygame.draw.rect(surface, (9, 8, 7, 222), surface.get_rect(), border_radius=18)
-        pygame.draw.rect(surface, (*border, 235), surface.get_rect(), 2, 18)
-        pygame.draw.line(surface, (*border, 160), (332, 42), (332, panel.height - 42), 2)
-        self.screen.blit(surface, panel.topleft)
-
-        wheel_center = (panel.x + 182, panel.y + 202)
-        spin_chamber = int(progress * 34) % 6
+        wheel_center = (SCREEN_WIDTH // 2, 226)
+        spin_amount = min(progress / reveal_at, 1.0)
+        spin_chamber = int(spin_amount * 28) % 6
         locked = reveal and event.chamber_index is not None
         active_chamber = event.chamber_index if locked else spin_chamber
-        pygame.draw.circle(self.screen, (36, 32, 28), wheel_center, 108)
-        pygame.draw.circle(self.screen, (128, 82, 43), wheel_center, 108, 5)
-        pygame.draw.circle(self.screen, (16, 14, 12), wheel_center, 45)
-        pygame.draw.circle(self.screen, (*border, 210), wheel_center, 45, 3)
-        for index in range(6):
-            theta = -math.pi / 2 + math.tau * index / 6
-            center = (
-                int(wheel_center[0] + math.cos(theta) * 65),
-                int(wheel_center[1] + math.sin(theta) * 65),
-            )
-            is_active = index == active_chamber
-            fill = (28, 25, 23)
-            ring = self.colors["gold"]
-            radius = 23
-            if is_active:
-                fill = (119, 36, 30) if reveal and lethal else (104, 79, 37)
-                ring = (255, 122, 82) if reveal and lethal else (255, 217, 135)
-                radius = 27
-            pygame.draw.circle(self.screen, fill, center, radius)
-            pygame.draw.circle(self.screen, ring, center, radius, 3)
-
-        pointer_end = (
-            int(wheel_center[0] + math.cos(-math.pi / 2) * 134),
-            int(wheel_center[1] + math.sin(-math.pi / 2) * 134),
+        chamber_angle = (
+            -math.tau * active_chamber / 6
+            if locked
+            else spin_amount * math.tau * 3.2
         )
-        pygame.draw.line(self.screen, border, wheel_center, pointer_end, 4)
+
+        self._draw_revolver_chamber_wheel(
+            wheel_center,
+            active_chamber,
+            chamber_angle,
+            reveal=reveal,
+            loaded=loaded,
+            accent=accent,
+        )
         pygame.draw.polygon(
             self.screen,
-            border,
+            accent,
             [
-                (pointer_end[0], pointer_end[1] - 10),
-                (pointer_end[0] - 9, pointer_end[1] + 8),
-                (pointer_end[0] + 9, pointer_end[1] + 8),
+                (wheel_center[0], wheel_center[1] - 104),
+                (wheel_center[0] - 9, wheel_center[1] - 86),
+                (wheel_center[0] + 9, wheel_center[1] - 86),
             ],
         )
-        if reveal and lethal:
-            flash_origin = (wheel_center[0] + 118, wheel_center[1] - 10)
-            pygame.draw.polygon(
-                self.screen,
-                (255, 208, 92),
-                [
-                    flash_origin,
-                    (flash_origin[0] + 88, flash_origin[1] - 34),
-                    (flash_origin[0] + 54, flash_origin[1] + 6),
-                    (flash_origin[0] + 102, flash_origin[1] + 42),
-                ],
-            )
-            pygame.draw.polygon(
-                self.screen,
-                (215, 60, 42),
-                [
-                    (flash_origin[0] + 18, flash_origin[1]),
-                    (flash_origin[0] + 66, flash_origin[1] - 18),
-                    (flash_origin[0] + 48, flash_origin[1] + 24),
-                ],
-            )
 
-        text_x = panel.x + 384
-        title = event.title.upper() if reveal else "SPINNING CHAMBER"
-        detail = event.detail if reveal else "The chamber turns. No one sees the round."
-        subtitle = event.subtitle if reveal else (event.target_name or event.subtitle)
-        self._blit_shadow_text(
-            self.fonts["hud_small"],
-            "REVOLVER PENALTY",
-            self.colors["gold"],
-            (text_x, panel.y + 56),
+        title = (
+            "ELIMINATED"
+            if reveal and eliminated
+            else "LOADED"
+            if reveal and loaded
+            else "SURVIVED"
+            if reveal
+            else "TRYING CHAMBER"
         )
-        self._blit_shadow_text(
+        detail = event.detail.upper() if reveal else "THE CHAMBER TURNS"
+        subtitle = event.subtitle.upper() if event.subtitle else ""
+        title_color = (255, 160, 116) if danger_result else (255, 241, 199)
+        self._blit_hud_text(
+            self.fonts["hud_body"],
+            "REVOLVER",
+            (SCREEN_WIDTH // 2, wheel_center[1] + 110),
+            anchor="center",
+            color=(222, 176, 86),
+        )
+        self._blit_hud_text(
             self.fonts["hud_title"],
             title,
-            self.colors["text"],
-            (text_x, panel.y + 92),
+            (SCREEN_WIDTH // 2, wheel_center[1] + 150),
+            anchor="center",
+            color=title_color,
         )
         if subtitle:
-            self._blit_shadow_text(
-                self.fonts["subtitle"],
+            self._blit_hud_text(
+                self.fonts["hud_body"],
                 subtitle,
-                border,
-                (text_x, panel.y + 142),
+                (SCREEN_WIDTH // 2, wheel_center[1] + 190),
+                anchor="center",
+                color=accent,
             )
-        self._draw_wrapped_text(
-            [detail],
-            pygame.Rect(text_x, panel.y + 194, panel.right - text_x - 42, 126),
-            self.fonts["body"],
-            self.colors["cream"],
+        self._draw_centered_hud_lines(
+            detail,
+            pygame.Rect(SCREEN_WIDTH // 2 - 330, wheel_center[1] + 220, 660, 58),
+            self.fonts["hud_small"],
+            (255, 235, 190),
         )
+        target = self._player_by_name(event.target_name)
+        if target is not None:
+            self._draw_revolver_status_chip(
+                target,
+                pygame.Rect(SCREEN_WIDTH // 2 - 54, wheel_center[1] + 286, 108, 26),
+            )
+        elif event.chance_percent is not None:
+            self._blit_hud_text(
+                self.fonts["hud_body"],
+                f"{event.chance_percent}% LOADED",
+                (SCREEN_WIDTH // 2, wheel_center[1] + 292),
+                anchor="center",
+                color=(222, 176, 86),
+            )
+        self._draw_minimal_progress(
+            pygame.Rect(SCREEN_WIDTH // 2 - 210, wheel_center[1] + 324, 420, 5),
+            accent,
+            progress,
+        )
+
+    def _draw_revolver_chamber_wheel(
+        self,
+        center: tuple[int, int],
+        active_chamber: int,
+        chamber_angle: float,
+        *,
+        reveal: bool,
+        loaded: bool,
+        accent: tuple[int, int, int],
+    ) -> None:
+        shadow = pygame.Surface((190, 176), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 98), shadow.get_rect())
+        self.screen.blit(shadow, shadow.get_rect(center=(center[0] + 7, center[1] + 12)))
+
+        pygame.draw.circle(self.screen, (18, 11, 7), center, 82)
+        pygame.draw.circle(self.screen, (92, 55, 27), center, 78)
+        pygame.draw.circle(self.screen, (37, 26, 18), center, 66)
+        pygame.draw.circle(self.screen, (226, 170, 73), center, 80, 2)
+        pygame.draw.circle(self.screen, (139, 90, 38), center, 66, 3)
+        pygame.draw.circle(self.screen, (12, 9, 7), center, 27)
+        pygame.draw.circle(self.screen, (226, 170, 73), center, 27, 2)
+
+        for index in range(6):
+            theta = -math.pi / 2 + math.tau * index / 6 + chamber_angle
+            chamber_center = (
+                int(center[0] + math.cos(theta) * 43),
+                int(center[1] + math.sin(theta) * 43),
+            )
+            is_active = index == active_chamber
+            hole_radius = 16 if not is_active else 19
+            pygame.draw.circle(self.screen, (9, 7, 5), chamber_center, hole_radius)
+            pygame.draw.circle(self.screen, (218, 157, 62), chamber_center, hole_radius, 2)
+            pygame.draw.circle(self.screen, (32, 22, 14), chamber_center, max(7, hole_radius - 6))
+            if is_active and reveal:
+                pygame.draw.circle(self.screen, accent, chamber_center, hole_radius + 4, 2)
+                if loaded:
+                    pygame.draw.circle(self.screen, (235, 184, 88), chamber_center, 9)
+                    pygame.draw.circle(self.screen, (126, 45, 31), chamber_center, 5)
+                else:
+                    pygame.draw.circle(self.screen, (246, 214, 136), chamber_center, 5, 2)
+            else:
+                pygame.draw.circle(self.screen, (246, 214, 136), (chamber_center[0] - 4, chamber_center[1] - 4), 2)
+
     def _draw_reputation_presentation(
         self,
         event: PresentationEvent,
@@ -1371,7 +1527,7 @@ class BluffingGameApp:
         self._draw_wrapped_text(
             [event.detail],
             pygame.Rect(panel.x + 28, panel.y + 70, panel.width - 56, 48),
-            self.fonts["small"],
+            self.fonts["hud_small"],
             self.colors["cream"],
         )
 
@@ -1459,6 +1615,47 @@ class BluffingGameApp:
         rect = surface.get_rect(**{anchor: pos})
         self.screen.blit(surface, rect)
         return rect
+
+    def _blit_hud_text(
+        self,
+        font: pygame.font.Font,
+        text: str,
+        pos: tuple[int, int],
+        *,
+        anchor: str = "topleft",
+        color: tuple[int, int, int] = (255, 252, 236),
+    ) -> pygame.Rect:
+        shadow = font.render(text, True, (0, 0, 0))
+        shadow.set_alpha(225)
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (2, 2)):
+            self.screen.blit(shadow, shadow.get_rect(**{anchor: (pos[0] + dx, pos[1] + dy)}))
+        surface = font.render(text, True, color)
+        rect = surface.get_rect(**{anchor: pos})
+        self.screen.blit(surface, rect)
+        return rect
+
+    def _draw_centered_hud_lines(
+        self,
+        text: str,
+        rect: pygame.Rect,
+        font: pygame.font.Font,
+        color: tuple[int, int, int],
+    ) -> None:
+        lines = self._wrap_line(text, font, rect.width)
+        if not lines:
+            return
+        line_height = font.get_linesize()
+        total_height = line_height * len(lines)
+        y = rect.y + max(0, (rect.height - total_height) // 2)
+        for line in lines:
+            self._blit_hud_text(
+                font,
+                line,
+                (rect.centerx, y + line_height // 2),
+                anchor="center",
+                color=color,
+            )
+            y += line_height
 
     def _draw_keycap(
         self,
@@ -1851,7 +2048,7 @@ class BluffingGameApp:
             return
         del now
         for player in self.state.players:
-            if player.is_human:
+            if player.is_human or player.eliminated:
                 continue
             center = self._reputation_plate_center(player, positions)
             self._draw_reputation_plate(player, center)
@@ -1884,39 +2081,108 @@ class BluffingGameApp:
         claimant = self.state.current_claimant_index == player.seat_index
         highlighted = self._presentation_targets_player(player)
         width = 176
-        height = 34
+        height = 66
         rect = pygame.Rect(0, 0, width, height)
         rect.center = center
-        panel = pygame.Surface(rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(panel, (7, 6, 5, 116), panel.get_rect(), border_radius=8)
-        pygame.draw.rect(panel, (139, 105, 55, 150), panel.get_rect(), 1, 8)
-        self.screen.blit(panel, rect.topleft)
         if active or claimant or highlighted:
             pygame.draw.line(
                 self.screen,
-                self.colors["gold"],
+                (235, 181, 80),
                 (rect.x + 8, rect.y + 2),
                 (rect.right - 8, rect.y + 2),
                 2,
             )
-        label = self.fonts["tiny"].render("REPUTATION", True, self.colors["text"])
-        self.screen.blit(label, label.get_rect(midleft=(rect.x + 10, rect.y + 13)))
-        rep_text = self.fonts["tiny"].render(str(player.reputation), True, self.colors["cream"])
-        self.screen.blit(rep_text, rep_text.get_rect(midright=(rect.right - 10, rect.y + 13)))
-        rep_rect = pygame.Rect(rect.x + 10, rect.y + 23, rect.width - 20, 7)
-        pygame.draw.rect(self.screen, (12, 10, 8), rep_rect, border_radius=4)
-        pygame.draw.rect(self.screen, (218, 176, 92), rep_rect, 1, border_radius=4)
+        self._blit_hud_text(
+            self.fonts["hud_small"],
+            "REPUTATION",
+            (rect.x + 8, rect.y + 17),
+            anchor="midleft",
+            color=(255, 236, 190),
+        )
+        self._blit_hud_text(
+            self.fonts["hud_small"],
+            str(player.reputation),
+            (rect.right - 8, rect.y + 17),
+            anchor="midright",
+            color=(255, 236, 190),
+        )
+        rep_rect = pygame.Rect(rect.x + 8, rect.y + 30, rect.width - 16, 6)
         fill_width = max(3, int(rep_rect.width * (player.reputation / 100)))
         pygame.draw.rect(
             self.screen,
-            self._reputation_color(player.reputation_band),
-            pygame.Rect(rep_rect.x + 1, rep_rect.y + 1, max(2, fill_width - 2), rep_rect.height - 2),
+            (70, 42, 20),
+            rep_rect,
             border_radius=3,
         )
+        pygame.draw.rect(self.screen, (128, 86, 39), rep_rect, 1, border_radius=3)
+        pygame.draw.rect(
+            self.screen,
+            (230, 178, 78),
+            pygame.Rect(rep_rect.x + 1, rep_rect.y + 1, max(2, fill_width - 2), rep_rect.height - 2),
+            border_radius=2,
+        )
+        self._draw_revolver_counter(player, (rect.x + 8, rect.y + 52), color=(255, 236, 190))
 
     def _presentation_targets_player(self, player: PlayerState) -> bool:
         event = self.presentation_event
         return event is not None and event.target_name == player.name
+
+    def _player_by_name(self, name: str | None) -> PlayerState | None:
+        if self.state is None or name is None:
+            return None
+        for player in self.state.players:
+            if player.name == name:
+                return player
+        return None
+
+    def _revolver_status_text(self, player: PlayerState) -> str:
+        spent = len(player.revolver.spent_indices)
+        total = max(1, len(player.revolver.chambers))
+        return f"{spent}/{total}"
+
+    def _draw_revolver_counter(
+        self,
+        player: PlayerState,
+        pos: tuple[int, int],
+        *,
+        color: tuple[int, int, int] | None = None,
+    ) -> pygame.Rect:
+        x, y = pos
+        text_color = color or (255, 236, 190)
+        icon_center = (x + 10, y)
+        self._draw_chamber_status_icon(icon_center)
+        status_rect = self._blit_hud_text(
+            self.fonts["hud_small"],
+            self._revolver_status_text(player),
+            (x + 25, y + 1),
+            anchor="midleft",
+            color=text_color,
+        )
+        return pygame.Rect(x, y - 10, 25 + status_rect.width, 20)
+
+    def _draw_chamber_status_icon(self, center: tuple[int, int]) -> None:
+        pygame.draw.circle(self.screen, (68, 38, 18), center, 10)
+        pygame.draw.circle(self.screen, (226, 170, 73), center, 10, 2)
+        pygame.draw.circle(self.screen, (255, 224, 150), center, 6, 1)
+        for index in range(6):
+            theta = -math.pi / 2 + math.tau * index / 6
+            dot = (
+                int(center[0] + math.cos(theta) * 5),
+                int(center[1] + math.sin(theta) * 5),
+            )
+            pygame.draw.circle(self.screen, (255, 224, 150), dot, 2)
+
+    def _draw_revolver_status_chip(self, player: PlayerState, rect: pygame.Rect) -> None:
+        self._draw_revolver_counter(player, (rect.x + 12, rect.centery), color=(255, 236, 190))
+
+    def _draw_human_revolver_status(self) -> None:
+        if self.state is None:
+            return
+        human = self.state.players[0]
+        if human.eliminated:
+            return
+        rect = pygame.Rect(28, 86, 138, 30)
+        self._draw_revolver_status_chip(human, rect)
 
     def _draw_human_hand(self, panel_rect: pygame.Rect, mouse_pos: tuple[int, int]) -> None:
         if self.state is None:
@@ -2114,7 +2380,7 @@ class BluffingGameApp:
         )
         if targeted:
             glow = pygame.Surface((rect.width + 34, rect.height + 34), pygame.SRCALPHA)
-            pygame.draw.ellipse(glow, (216, 60, 44, 36), glow.get_rect())
+            pygame.draw.ellipse(glow, (232, 78, 55, 34), glow.get_rect())
             self.screen.blit(glow, glow.get_rect(center=rect.center))
         self.screen.blit(image, rect.topleft)
         return True
